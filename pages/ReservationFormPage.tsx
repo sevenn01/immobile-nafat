@@ -167,7 +167,7 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
         return (
             <div 
                 ref={printRef} 
-                className="bg-white mx-auto flex flex-col print:m-0 font-sans relative print:!bg-none print:shadow-none" 
+                className="bg-white mx-auto flex flex-col print:m-0 font-sans relative print:shadow-none" 
                 style={{ 
                     width: '210mm', 
                     height: '297mm', 
@@ -175,8 +175,10 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                     backgroundImage: 'url("/nafat_letterhead.png")',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat'
-                }}
+                    backgroundRepeat: 'no-repeat',
+                    WebkitPrintColorAdjust: 'exact',
+                    printColorAdjust: 'exact'
+                } as React.CSSProperties}
             >
                 
                 {/* SPACER FOR TOP LOGO AREA */}
