@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-gray-800;
+  }
+}
+
+/* Custom Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400;
+}
+
+/* Splash Screen Animations */
+@keyframes slide-up-reveal {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0%); }
+}
+
+@keyframes slide-down-text {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slide-up-and-out {
+  to { transform: translateY(-100%); opacity: 0; }
+}
+
+@keyframes slide-up-from-bottom {
+  from { transform: translateY(50px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-up-reveal {
+  animation: slide-up-reveal 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-down-text {
+  animation: slide-down-text 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+}
+
+.animate-slide-up-and-out {
+  animation: slide-up-and-out 0.8s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+}
+
+.animate-slide-up-from-bottom {
+  animation: slide-up-from-bottom 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
