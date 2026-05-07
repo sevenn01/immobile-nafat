@@ -353,73 +353,57 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
     }
     
     return (
-        <div className="fixed inset-0 bg-black/85 z-50 flex justify-center items-start p-4 overflow-auto backdrop-blur-sm" onClick={onClose}>
+        <div id="print-modal-overlay-res" className="fixed inset-0 bg-black/85 z-50 flex justify-center items-start p-4 overflow-auto backdrop-blur-sm" onClick={onClose}>
             <style>
                 {`
                     @media print {
-                        /* 1. Global Print Reset */
                         @page {
                             size: A4 portrait;
                             margin: 0;
                         }
 
+                        /* 1. Global Reset */
                         html, body {
                             margin: 0 !important;
                             padding: 0 !important;
-                            height: auto !important;
+                            height: 100% !important;
                             width: 100% !important;
-                            overflow: visible !important;
+                            overflow: hidden !important;
                             background-color: white !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
                         }
 
-                        /* 2. Hide Everything by Default */
-                        body * {
-                            visibility: hidden !important;
-                        }
-
-                        /* 3. Show ONLY the Path to the Document */
-                        #root, 
-                        #root *, 
-                        main, 
-                        main *, 
-                        .container, 
-                        .container *, 
-                        .fixed.inset-0, 
-                        #reservation-document, 
-                        #reservation-document * {
-                            visibility: visible !important;
-                        }
-
-                        /* 4. Force specific UI elements to COMPLETELY DISAPPEAR */
-                        aside, header, nav, footer, .no-print, button, .flex-shrink-0 {
+                        /* 2. Hide Everything with absolute precision */
+                        body > *:not(#root) {
                             display: none !important;
                         }
 
-                        /* 5. Reset layouts */
-                        #root, main, .container, .fixed.inset-0 {
-                            position: absolute !important;
-                            top: 0 !important;
-                            left: 0 !important;
-                            width: 100% !important;
-                            height: 100% !important;
+                        #root > *:not(main),
+                        main > *:not(#print-modal-overlay-res),
+                        #print-modal-overlay-res > *:not(#print-modal-content-res),
+                        #print-modal-content-res > .no-print {
+                            display: none !important;
+                        }
+
+                        /* 3. Force Hierarchy visibility */
+                        #root, main, #print-modal-overlay-res, #print-modal-content-res, #reservation-document-container, #reservation-document, #reservation-document * {
+                            display: block !important;
+                            visibility: visible !important;
+                            opacity: 1 !important;
+                            position: static !important;
+                            width: auto !important;
+                            height: auto !important;
                             margin: 0 !important;
                             padding: 0 !important;
-                            display: block !important;
-                            overflow: visible !important;
-                            background: white !important;
                             box-shadow: none !important;
                             border: none !important;
-                            transform: none !important;
                         }
 
-                        /* 6. Ensure background content is hidden */
-                        main div.container > div:not(.fixed) {
-                            display: none !important;
-                        }
-
-                        /* 7. Position the target document exactly */
+                        /* 4. The target document layout */
                         #reservation-document {
                             display: flex !important;
+                            flex-direction: column !important;
                             position: absolute !important;
                             top: 0 !important;
                             left: 0 !important;
@@ -427,15 +411,15 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             height: 297mm !important;
                             margin: 0 !important;
                             padding: 0 !important;
+                            box-sizing: border-box !important;
                             background-color: white !important;
                             z-index: 9999999 !important;
-                            box-shadow: none !important;
-                            border: none !important;
+                            page-break-after: always;
                         }
                     }
                 `}
             </style>
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl flex flex-col my-4 md:my-6 overflow-hidden border border-white/10 max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
+            <div id="print-modal-content-res" className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl flex flex-col my-4 md:my-6 overflow-hidden border border-white/10 max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
                 <div className="flex-shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-900 px-6 sm:px-8 py-4 sm:py-5 no-print gap-4">
                     <div className="flex flex-col">
                         <div className="flex items-center">
@@ -461,7 +445,7 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                         </button>
                     </div>
                 </div>
-                 <div className="overflow-auto bg-slate-100/50 p-2 sm:p-4 md:p-8 modal-print-container flex justify-center no-print-padding">
+                 <div id="reservation-document-container" className="overflow-auto bg-slate-100/50 p-2 sm:p-4 md:p-8 modal-print-container flex justify-center no-print-padding">
                     <div 
                         ref={containerRef}
                         className="shadow-2xl bg-white origin-top transition-transform duration-300 print-transform-none" 
