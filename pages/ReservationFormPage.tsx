@@ -415,6 +415,7 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                         #reservation-document {
                             position: fixed !important;
                             top: 0 !important;
+                            margin-top: 0 !important;
                             left: 0 !important;
                             width: 210mm !important;
                             height: 297mm !important;

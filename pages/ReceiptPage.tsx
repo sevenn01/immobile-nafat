@@ -304,6 +304,7 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                         #printable-receipt {
                             position: fixed !important;
                             top: 0 !important;
+                            margin-top: 0 !important;
                             left: 0 !important;
                             width: 210mm !important;
                             height: 297mm !important;
@@ -314,6 +315,7 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                             z-index: 1000000 !important;
                             display: flex !important;
                             flex-direction: column !important;
+                            transform: none !important;
                         }
                         
                         /* 6. Hide common UI buttons/headers inside the whitelisted containers */
