@@ -280,13 +280,15 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                             margin: 0 !important;
                             padding: 0 !important;
                             height: auto !important;
+                            width: 100% !important;
                             overflow: visible !important;
                             background-color: white !important;
+                            visibility: hidden !important;
                         }
 
-                        /* 2. Hide Sidebar, Header and other non-print elements */
-                        aside, header, nav, .no-print, button, .flex-shrink-0 {
-                            display: none !important;
+                        /* 2. Show only the printable receipt and its contents */
+                        #printable-receipt, #printable-receipt * {
+                            visibility: visible !important;
                         }
 
                         /* 3. Reset all parent containers to not clip or shift content */
@@ -302,9 +304,15 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                             background: none !important;
                             box-shadow: none !important;
                             border: none !important;
+                            visibility: visible !important;
                         }
 
-                        /* 4. The target printable document */
+                        /* 4. Hide all siblings of the receipt path explicitly to be safe */
+                        .no-print, header, aside, nav, button, .flex-shrink-0 {
+                            display: none !important;
+                        }
+
+                        /* 5. The target printable document positioning */
                         #printable-receipt {
                             display: flex !important;
                             position: absolute !important;
