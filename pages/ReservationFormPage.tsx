@@ -357,22 +357,19 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
             <style>
                 {`
                     @media print {
-                        /* 1. Hide everything on the body */
-                        body {
+                        /* 1. Reset everything to hidden */
+                        body * {
                             visibility: hidden !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            background: white !important;
                         }
                         
-                        /* 2. Show specifically the printable container and all its children */
+                        /* 2. Show specifically the printable container and all its descendants */
                         #reservation-document, #reservation-document * {
                             visibility: visible !important;
                         }
                         
-                        /* 3. Position the printable area at the absolute top-left of the page */
+                        /* 3. Force the printable area to the top-left */
                         #reservation-document {
-                            position: fixed !important;
+                            position: absolute !important;
                             left: 0 !important;
                             top: 0 !important;
                             width: 210mm !important;
@@ -383,29 +380,34 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             box-shadow: none !important;
                             background-color: white !important;
                             z-index: 999999 !important;
-                            /* Reset any shifts/transforms */
                             transform: none !important;
+                            display: flex !important;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
                         }
 
-                        /* 4. Hide UI containers that might interfere with layout/clicks during print */
-                        .no-print, header, aside, .fixed.inset-0, .overflow-auto {
-                            background: none !important;
-                            box-shadow: none !important;
-                            border: none !important;
-                        }
-
-                        /* Ensure no parent containers force backgrounds or borders */
-                        #root, main, .container {
+                        /* 4. Ensure parent containers don't clip or shift the document */
+                        html, body, #root, main, .fixed, .overflow-auto, .modal-print-container {
+                            overflow: visible !important;
+                            height: auto !important;
+                            width: auto !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
                             background: none !important;
                             border: none !important;
                             box-shadow: none !important;
+                            transform: none !important;
+                            position: static !important;
                         }
                         
                         @page {
                             size: A4;
                             margin: 0;
+                        }
+
+                        /* Hide standard UI elements just in case visibility trick misses them */
+                        .no-print, header, aside, nav, button {
+                            display: none !important;
                         }
                     }
                 `}
