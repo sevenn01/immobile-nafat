@@ -374,18 +374,44 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             print-color-adjust: exact !important;
                         }
 
-                        /* 2. Hide Everything by using visibility */
+                        /* 2. Hide everything by default */
                         body * {
                             visibility: hidden !important;
                         }
 
-                        /* 3. Show ONLY the target document and its contents */
-                        #reservation-document,
+                        /* 3. Show ONLY the path to the document */
+                        #root, 
+                        #root *, 
+                        main, 
+                        main *, 
+                        #print-modal-overlay-res, 
+                        #print-modal-overlay-res *, 
+                        #print-modal-content-res, 
+                        #print-modal-content-res *, 
+                        #reservation-document-container,
+                        #reservation-document-container *,
+                        #reservation-document-wrapper,
+                        #reservation-document-wrapper *,
+                        #reservation-document, 
                         #reservation-document * {
                             visibility: visible !important;
+                            transform: none !important; /* CRITICAL: Remove scale during print */
                         }
 
-                        /* 4. Force the document to the exact top-left of the first page */
+                        /* 4. Force specific containers to not clip or shift */
+                        #reservation-document-container, 
+                        #reservation-document-wrapper {
+                            display: block !important;
+                            position: static !important;
+                            width: auto !important;
+                            height: auto !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            overflow: visible !important;
+                            transform: none !important;
+                        }
+
+                        /* 5. Force the document to the top left of the page */
                         #reservation-document {
                             position: fixed !important;
                             top: 0 !important;
@@ -399,10 +425,11 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             z-index: 1000000 !important;
                             display: flex !important;
                             flex-direction: column !important;
+                            transform: none !important;
                         }
 
-                        /* 5. Ensure no other content blocks the print area */
-                        .no-print, nav, aside, header, button {
+                        /* 6. Hide common UI buttons/headers inside the whitelisted containers */
+                        .no-print, button, .flex-shrink-0 {
                             display: none !important;
                         }
                     }
@@ -435,16 +462,16 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                     </div>
                 </div>
                  <div id="reservation-document-container" className="overflow-auto bg-slate-100/50 p-2 sm:p-4 md:p-8 modal-print-container flex justify-center no-print-padding">
-                    <div 
-                        ref={containerRef}
-                        className="shadow-2xl bg-white origin-top transition-transform duration-300 print-transform-none" 
-                        style={{ 
-                            transform: `scale(${scale})`,
-                            width: '210mm',
-                            minWidth: '210mm',
-                            marginBottom: `-${(1 - scale) * 1123}px`
-                        }}
-                    >
+                <div id="reservation-document-wrapper"
+                    ref={containerRef}
+                    className="shadow-2xl bg-white origin-top transition-transform duration-300" 
+                    style={{ 
+                        transform: `scale(${scale})`,
+                        width: '210mm',
+                        minWidth: '210mm',
+                        marginBottom: `-${(1 - scale) * 1123}px`
+                    }}
+                >
                         {renderDocument()}
                     </div>
                 </div>

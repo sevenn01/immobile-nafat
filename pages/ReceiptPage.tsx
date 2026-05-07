@@ -268,18 +268,39 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                             print-color-adjust: exact !important;
                         }
 
-                        /* 2. Hide Everything by using visibility */
+                        /* 2. Hide everything by default */
                         body * {
                             visibility: hidden !important;
                         }
 
-                        /* 3. Show ONLY the target receipt and its contents */
-                        #printable-receipt,
+                        /* 3. Show ONLY the path to the document */
+                        #root, 
+                        #root *, 
+                        main, 
+                        main *, 
+                        #print-modal-overlay, 
+                        #print-modal-overlay *, 
+                        #print-modal-content, 
+                        #print-modal-content *, 
+                        #printable-receipt-container,
+                        #printable-receipt-container *,
+                        #printable-receipt, 
                         #printable-receipt * {
                             visibility: visible !important;
                         }
 
-                        /* 4. Force the receipt to the exact top-left of the first page */
+                        /* 4. Force specific containers to not clip or shift */
+                        #printable-receipt-container {
+                            display: block !important;
+                            position: static !important;
+                            width: auto !important;
+                            height: auto !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            overflow: visible !important;
+                        }
+
+                        /* 5. Force the receipt to the exact top-left of the first page */
                         #printable-receipt {
                             position: fixed !important;
                             top: 0 !important;
@@ -295,8 +316,8 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                             flex-direction: column !important;
                         }
                         
-                        /* 5. Ensure no other content blocks the print area */
-                        .no-print, nav, aside, header, button {
+                        /* 6. Hide common UI buttons/headers inside the whitelisted containers */
+                        .no-print, button, .flex-shrink-0 {
                             display: none !important;
                         }
                     }
