@@ -303,7 +303,7 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                         /* 5. Force the receipt to the exact top-left of the first page */
                         #printable-receipt {
                             position: fixed !important;
-                            top: 0 !important;
+                            top: 8mm !important;
                             margin-top: 0 !important;
                             left: 0 !important;
                             width: 210mm !important;

@@ -414,7 +414,7 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                         /* 5. Force the document to the top left of the page */
                         #reservation-document {
                             position: fixed !important;
-                            top: 0 !important;
+                            top: 8mm !important;
                             margin-top: 0 !important;
                             left: 0 !important;
                             width: 210mm !important;
