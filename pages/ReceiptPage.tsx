@@ -270,66 +270,69 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
             <style>
                 {`
                     @media print {
-                        /* 1. Hide everything by default */
-                        html, body, #root, main {
-                            visibility: hidden !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            height: auto !important;
-                            width: auto !important;
-                            overflow: visible !important;
-                            background: white !important;
+                        /* 1. Reset and hide UI */
+                        .no-print, header, aside, nav, button, .flex-shrink-0 {
+                            display: none !important;
                         }
                         
-                        /* 2. Show specifically the printable container and all its children */
-                        #printable-receipt, #printable-receipt * {
-                            visibility: visible !important;
-                            opacity: 1 !important;
-                        }
-                        
-                        /* 3. Position the printable area at the absolute top-left of the page */
-                        #printable-receipt {
-                            visibility: visible !important;
-                            display: block !important;
-                            position: fixed !important;
-                            left: 0 !important;
-                            top: 0 !important;
-                            width: 210mm !important;
-                            height: 297mm !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            border: none !important;
-                            box-shadow: none !important;
-                            background-color: white !important;
-                            z-index: 9999999 !important; /* Extremely high z-index */
-                            transform: none !important;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
-                        }
-
-                        /* 4. Ensure ancestors don't interfere */
-                        .fixed, .overflow-auto, .no-print-bg, .no-print-padding {
-                            visibility: visible !important;
-                            position: static !important;
-                            overflow: visible !important;
-                            transform: none !important;
-                            background: none !important;
-                            box-shadow: none !important;
-                            border: none !important;
-                            padding: 0 !important;
-                            margin: 0 !important;
-                        }
-                        
+                        /* 2. Force the page to A4 */
                         @page {
                             size: A4 portrait;
                             margin: 0;
                         }
 
-                        /* 5. Force hide absolutely everything else */
-                        .no-print, header, aside, nav, button, .flex-shrink-0 {
-                            display: none !important;
-                            visibility: hidden !important;
-                            opacity: 0 !important;
+                        /* 3. Setup the body for full page print */
+                        html, body {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            height: auto !important;
+                            width: auto !important;
+                            background: white !important;
+                            overflow: visible !important;
+                        }
+
+                        /* 4. Position the printable receipt exactly at the top */
+                        #printable-receipt {
+                            position: absolute !important;
+                            top: 0 !important;
+                            left: 0 !important;
+                            width: 210mm !important;
+                            height: 297mm !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            background: white !important;
+                            border: none !important;
+                            box-shadow: none !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                            z-index: 99999 !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                            visibility: visible !important;
+                        }
+
+                        /* 5. Ensure parent containers don't interfere with rendering */
+                        #root, main, div, section {
+                            position: static !important;
+                            display: block !important;
+                            visibility: visible !important;
+                            background: none !important;
+                            border: none !important;
+                            box-shadow: none !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            overflow: visible !important;
+                            max-height: none !important;
+                            max-width: none !important;
+                            transform: none !important;
+                        }
+
+                        /* 6. Specifically hide everything else EXCEPT the path to the printable receipt */
+                        body * {
+                            visibility: hidden;
+                        }
+                        #root, #root *, main, main *, #printable-receipt, #printable-receipt * {
+                            visibility: visible;
                         }
                     }
                 `}
