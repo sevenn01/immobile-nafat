@@ -266,86 +266,70 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
     }
     
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-start p-4 overflow-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-start p-4 overflow-auto no-print-bg" onClick={onClose}>
             <style>
                 {`
                     @media print {
-                        /* 1. Reset and hide UI */
-                        .no-print, header, aside, nav, button, .flex-shrink-0 {
-                            display: none !important;
-                        }
-                        
-                        /* 2. Force the page to A4 */
+                        /* 1. Global Print Reset */
                         @page {
                             size: A4 portrait;
                             margin: 0;
                         }
 
-                        /* 3. Setup the body for full page print */
                         html, body {
                             margin: 0 !important;
                             padding: 0 !important;
                             height: auto !important;
-                            width: auto !important;
-                            background: white !important;
                             overflow: visible !important;
+                            background-color: white !important;
                         }
 
-                        /* 4. Position the printable receipt exactly at the top */
+                        /* 2. Hide Sidebar, Header and other non-print elements */
+                        aside, header, nav, .no-print, button, .flex-shrink-0 {
+                            display: none !important;
+                        }
+
+                        /* 3. Reset all parent containers to not clip or shift content */
+                        #root, main, .container, .fixed, .no-print-bg, .no-print-padding {
+                            position: static !important;
+                            display: block !important;
+                            width: auto !important;
+                            height: auto !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            overflow: visible !important;
+                            transform: none !important;
+                            background: none !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                        }
+
+                        /* 4. The target printable document */
                         #printable-receipt {
-                            position: fixed !important;
+                            display: flex !important;
+                            position: absolute !important;
                             top: 0 !important;
                             left: 0 !important;
                             width: 210mm !important;
                             height: 297mm !important;
                             margin: 0 !important;
                             padding: 0 !important;
-                            background: white !important;
-                            border: none !important;
-                            box-shadow: none !important;
-                            display: flex !important;
-                            flex-direction: column !important;
-                            z-index: 9999999 !important;
+                            background-color: white !important;
+                            z-index: 99999 !important;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
-                            visibility: visible !important;
-                        }
-
-                        /* 5. Ensure parent containers don't interfere with rendering */
-                        #root, main, .no-print-bg, .no-print-padding {
-                            position: static !important;
-                            display: block !important;
-                            visibility: visible !important;
-                            background: none !important;
-                            border: none !important;
                             box-shadow: none !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            overflow: visible !important;
-                            max-height: none !important;
-                            max-width: none !important;
-                            transform: none !important;
-                        }
-
-                        /* 6. Specifically hide everything else EXCEPT the path to the printable receipt */
-                        body * {
-                            visibility: hidden;
-                        }
-                        #root, #root *, main, main *, .no-print-bg, .no-print-bg *, .no-print-padding, .no-print-padding *, #printable-receipt, #printable-receipt * {
-                            visibility: visible;
-                        }
-                        
-                        /* 7. Re-hide standard UI and non-printable elements that might be shown by step 6 */
-                        .no-print, header, aside, nav, button, .flex-shrink-0 {
-                            display: none !important;
-                            visibility: hidden !important;
+                            border: none !important;
                         }
                     }
                 `}
             </style>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl flex flex-col my-4 md:my-8 max-h-[90vh] no-print-bg" onClick={(e) => e.stopPropagation()}>
                 <div className="flex-shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b p-4 bg-white rounded-t-lg gap-4 no-print">
-                    <h3 className="text-lg font-semibold text-gray-800">Aperçu du Document</h3>
+                    <div className="flex flex-col">
+                        <h3 className="text-lg font-semibold text-gray-800">Aperçu du Document</h3>
+                        <p className="text-xs text-blue-600 font-medium mt-1">Note: Pour un meilleur résultat, cliquez sur l'icône <span className="p-0.5 border rounded">↗</span> (Ouvrir dans un nouvel onglet) en haut à droite du preview.</p>
+                    </div>
                     <div className="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
                         <button onClick={handlePrint} className="flex-shrink-0 flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-bold">
                             <PrinterIcon className="w-4 h-4 mr-1.5" /> Imprimer

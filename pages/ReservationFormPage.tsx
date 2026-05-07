@@ -353,93 +353,77 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
     }
     
     return (
-        <div className="fixed inset-0 bg-black/85 z-50 flex justify-center items-start p-4 overflow-auto backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/85 z-50 flex justify-center items-start p-4 overflow-auto backdrop-blur-sm" onClick={onClose}>
             <style>
                 {`
                     @media print {
-                        /* 1. Reset and hide UI */
-                        .no-print, header, aside, nav, button, .flex-shrink-0 {
-                            display: none !important;
-                        }
-                        
-                        /* 2. Force the page to A4 */
+                        /* 1. Global Print Reset */
                         @page {
                             size: A4 portrait;
                             margin: 0;
                         }
 
-                        /* 3. Setup the body for full page print */
                         html, body {
                             margin: 0 !important;
                             padding: 0 !important;
                             height: auto !important;
-                            width: auto !important;
-                            background: white !important;
                             overflow: visible !important;
+                            background-color: white !important;
                         }
 
-                        /* 4. Position the printable document exactly at the top */
+                        /* 2. Hide Sidebar, Header and other non-print elements */
+                        aside, header, nav, .no-print, button, .flex-shrink-0 {
+                            display: none !important;
+                        }
+
+                        /* 3. Reset all parent containers to not clip or shift content */
+                        #root, main, .container, .fixed, .modal-print-container, .no-print-padding {
+                            position: static !important;
+                            display: block !important;
+                            width: auto !important;
+                            height: auto !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            overflow: visible !important;
+                            transform: none !important;
+                            background: none !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                        }
+
+                        /* 4. The target printable document */
                         #reservation-document {
-                            position: fixed !important;
+                            display: flex !important;
+                            position: absolute !important;
                             top: 0 !important;
                             left: 0 !important;
                             width: 210mm !important;
                             height: 297mm !important;
                             margin: 0 !important;
                             padding: 0 !important;
-                            background: white !important;
-                            border: none !important;
-                            box-shadow: none !important;
-                            display: flex !important;
-                            flex-direction: column !important;
-                            z-index: 9999999 !important;
+                            background-color: white !important;
+                            z-index: 99999 !important;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
-                            visibility: visible !important;
-                        }
-
-                        /* 5. Ensure parent containers don't interfere with rendering */
-                        #root, main, .modal-print-container, .no-print-padding {
-                            position: static !important;
-                            display: block !important;
-                            visibility: visible !important;
-                            background: none !important;
-                            border: none !important;
                             box-shadow: none !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            overflow: visible !important;
-                            max-height: none !important;
-                            max-width: none !important;
-                            transform: none !important;
-                        }
-
-                        /* 6. Specifically hide everything else EXCEPT the path to the printable document */
-                        body * {
-                            visibility: hidden;
-                        }
-                        #root, #root *, main, main *, .modal-print-container, .modal-print-container *, .no-print-padding, .no-print-padding *, #reservation-document, #reservation-document * {
-                            visibility: visible;
-                        }
-                        
-                        /* 7. Re-hide standard UI and non-printable elements that might be shown by step 6 */
-                        .no-print, header, aside, nav, button, .flex-shrink-0 {
-                            display: none !important;
-                            visibility: hidden !important;
+                            border: none !important;
                         }
                     }
                 `}
             </style>
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl flex flex-col my-4 md:my-6 overflow-hidden border border-white/10 max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
                 <div className="flex-shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-900 px-6 sm:px-8 py-4 sm:py-5 no-print gap-4">
-                    <div className="flex items-center">
-                        <div className="p-2 sm:p-3 bg-blue-500/15 rounded-2xl mr-4">
-                            <FileTextIcon className="w-6 h-6 sm:w-7 sm:h-7 text-blue-400" />
+                    <div className="flex flex-col">
+                        <div className="flex items-center">
+                            <div className="p-2 sm:p-3 bg-blue-500/15 rounded-2xl mr-4">
+                                <FileTextIcon className="w-6 h-6 sm:w-7 sm:h-7 text-blue-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight leading-none uppercase">Bon de Réservation</h3>
+                                <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 sm:mt-1.5">Édition Document Officiel</p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight leading-none uppercase">Bon de Réservation</h3>
-                            <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 sm:mt-1.5">Édition Document Officiel</p>
-                        </div>
+                        <p className="text-[10px] text-blue-400 font-medium mt-2">Note: Pour un meilleur résultat, cliquez sur l'icône <span className="p-0.5 border border-blue-400/30 rounded text-blue-300">↗</span> (Nouvel onglet) en haut à droite du preview AI Studio.</p>
                     </div>
                     <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
                         <button onClick={handlePrint} className="flex-shrink-0 flex items-center px-4 py-2.5 bg-indigo-600 text-white rounded-xl sm:rounded-2xl hover:bg-indigo-700 text-xs sm:text-sm font-bold shadow-xl transition-all transform active:scale-95">
