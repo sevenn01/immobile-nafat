@@ -128,18 +128,19 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
     const handleDownloadPdf = () => {
         const element = printRef.current;
         if (element && window.html2pdf) {
-            const filename = `Reservation_${data?.contract.id.substring(0, 6).toUpperCase()}.pdf`;
+            const filename = `Reservation_${data?.contract.id.substring(data.contract.id.length - 6).toUpperCase()}.pdf`;
             const opt = {
                 margin:       0,
                 filename:     filename,
-                image:        { type: 'jpeg', quality: 1 },
+                image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { 
-                    scale: 3, 
+                    scale: 2, 
                     useCORS: true, 
                     letterRendering: true,
-                    scrollY: -window.scrollY
+                    logging: false
                 },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
             };
             window.html2pdf().from(element).set(opt).save();
         }
@@ -173,13 +174,15 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
             <div 
                 id="reservation-document"
                 ref={printRef} 
-                className="bg-white mx-auto flex flex-col print:m-0 font-sans relative print:shadow-none" 
+                className="bg-white mx-auto flex flex-col print:m-0 font-sans relative print:shadow-none overflow-hidden" 
                 style={{ 
                     width: '210mm', 
-                    height: '297mm', 
+                    height: '297mm',
+                    minHeight: '297mm',
+                    maxHeight: '297mm',
                     padding: '0',
                     backgroundImage: 'url("/nafat_letterhead.png")',
-                    backgroundSize: 'cover',
+                    backgroundSize: '100% 100%',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
                     WebkitPrintColorAdjust: 'exact',
@@ -354,15 +357,13 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
     
     return (
         <div id="print-modal-overlay-res" className="fixed inset-0 bg-black/85 z-50 flex justify-center items-start p-4 overflow-auto backdrop-blur-sm" onClick={onClose}>
-            <style>
-                {`
+                <style>
+                    {`
                     @media print {
                         @page {
                             size: A4 portrait;
-                            margin: 0;
+                            margin: 0 !important;
                         }
-
-                        /* 1. Global Reset */
                         html, body {
                             margin: 0 !important;
                             padding: 0 !important;
@@ -374,68 +375,36 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             print-color-adjust: exact !important;
                         }
 
-                        /* 2. Hide everything by default */
+                        /* 1. Hide everything */
                         body * {
                             visibility: hidden !important;
                         }
 
-                        /* 3. Show ONLY the path to the document */
-                        #root, 
-                        #root *, 
-                        main, 
-                        main *, 
-                        #print-modal-overlay-res, 
-                        #print-modal-overlay-res *, 
-                        #print-modal-content-res, 
-                        #print-modal-content-res *, 
-                        #reservation-document-container,
-                        #reservation-document-container *,
-                        #reservation-document-wrapper,
-                        #reservation-document-wrapper *,
-                        #reservation-document, 
+                        /* 2. Show the reservation document only */
+                        #reservation-document,
                         #reservation-document * {
                             visibility: visible !important;
-                            transform: none !important; /* CRITICAL: Remove scale during print */
                         }
 
-                        /* 4. Force specific containers to not clip or shift */
-                        #reservation-document-container, 
-                        #reservation-document-wrapper {
-                            display: block !important;
-                            position: static !important;
-                            width: auto !important;
-                            height: auto !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            overflow: visible !important;
-                            transform: none !important;
-                        }
-
-                        /* 5. Force the document to the top left of the page */
                         #reservation-document {
                             position: fixed !important;
-                            top: 8mm !important;
-                            margin-top: 0 !important;
+                            top: 0 !important;
                             left: 0 !important;
                             width: 210mm !important;
                             height: 297mm !important;
-                            padding: 0mm !important;
+                            padding: 0 !important;
                             margin: 0 !important;
-                            box-sizing: border-box !important;
                             background-color: white !important;
-                            z-index: 1000000 !important;
-                            display: flex !important;
-                            flex-direction: column !important;
+                            z-index: 999999 !important;
                             transform: none !important;
                         }
 
-                        /* 6. Hide common UI buttons/headers inside the whitelisted containers */
-                        .no-print, button, .flex-shrink-0 {
+                        .no-print {
                             display: none !important;
                         }
                     }
-                `}
-            </style>
+                    `}
+                </style>
             <div id="print-modal-content-res" className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl flex flex-col my-4 md:my-6 overflow-hidden border border-white/10 max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
                 <div className="flex-shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-900 px-6 sm:px-8 py-4 sm:py-5 no-print gap-4">
                     <div className="flex flex-col">
