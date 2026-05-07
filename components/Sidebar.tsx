@@ -17,7 +17,7 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <div className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200">
+    <div className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 no-print">
       <div className="flex items-center h-16 px-6 border-b border-gray-200">
          <h1 className="text-xl font-bold text-gray-800">Nafat Immobilier</h1>
       </div>

@@ -61,3 +61,34 @@
 .animate-slide-up-from-bottom {
   animation: slide-up-from-bottom 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .animate-slide-up-from-bottom {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  
+  body, #root {
+    background: white !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: auto !important;
+  }
+  
+  /* Reset some flex layouts that might break printing */
+  .flex.h-screen {
+    display: block !important;
+    height: auto !important;
+  }
+  
+  main, .overflow-y-auto {
+    overflow: visible !important;
+    height: auto !important;
+    display: block !important;
+  }
+}

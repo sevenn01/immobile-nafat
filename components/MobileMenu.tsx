@@ -29,14 +29,14 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
     <>
         {/* Overlay */}
         <div 
-            className={`fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
+            className={`fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden transition-opacity duration-300 no-print ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
             onClick={onClose}
             aria-hidden="true"
         ></div>
         
         {/* Menu Panel */}
         <div 
-            className={`fixed top-0 left-0 flex flex-col w-64 h-full bg-white shadow-xl z-40 md:hidden transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+            className={`fixed top-0 left-0 flex flex-col w-64 h-full bg-white shadow-xl z-40 md:hidden transform transition-transform duration-300 ease-in-out no-print ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
         >
             <div className="flex items-center justify-between h-16 border-b border-gray-200 px-4">
                 <h1 className="text-xl font-semibold text-gray-800">Nafat Immobilier</h1>

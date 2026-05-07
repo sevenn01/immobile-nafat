@@ -363,31 +363,60 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             padding: 0 !important;
                         }
                         
-                        /* Standard approach: hide everything and show only the document */
-                        body > * {
-                            visibility: hidden !important;
+                        /* Hide UI elements */
+                        .no-print, header, aside, nav, button {
+                            display: none !important;
                         }
                         
-                        #reservation-document, #reservation-document * {
-                            visibility: visible !important;
+                        /* Reset modal/fixed containers */
+                        .fixed.inset-0 {
+                            position: absolute !important;
+                            display: block !important;
+                            background: white !important;
+                            z-index: auto !important;
+                            overflow: visible !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
                         }
-                        
+
+                        /* Target the card container to be transparent and full width */
+                        .bg-white.rounded-3xl.shadow-2xl {
+                            background: none !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            max-height: none !important;
+                            display: block !important;
+                            overflow: visible !important;
+                        }
+
+                        .no-print-padding {
+                            padding: 0 !important;
+                            background: none !important;
+                            display: block !important;
+                        }
+
                         #reservation-document {
                             display: flex !important;
-                            position: fixed !important;
-                            left: 0 !important;
-                            top: 0 !important;
+                            visibility: visible !important;
+                            position: static !important;
                             width: 210mm !important;
                             height: 297mm !important;
                             margin: 0 !important;
                             padding: 0 !important;
-                            border: none !important;
-                            box-shadow: none !important;
+                            page-break-after: avoid;
+                            page-break-before: avoid;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
-                            z-index: 10000 !important;
                         }
-                        
+
+                        /* Ensure transform does not affect print */
+                        .print-transform-none {
+                            transform: none !important;
+                            margin-bottom: 0 !important;
+                        }
+
                         @page {
                             size: A4;
                             margin: 0;
@@ -418,10 +447,10 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                         </button>
                     </div>
                 </div>
-                 <div className="overflow-auto bg-slate-100/50 p-2 sm:p-4 md:p-8 modal-print-container flex justify-center">
+                 <div className="overflow-auto bg-slate-100/50 p-2 sm:p-4 md:p-8 modal-print-container flex justify-center no-print-padding">
                     <div 
                         ref={containerRef}
-                        className="shadow-2xl bg-white origin-top transition-transform duration-300" 
+                        className="shadow-2xl bg-white origin-top transition-transform duration-300 print-transform-none" 
                         style={{ 
                             transform: `scale(${scale})`,
                             width: '210mm',

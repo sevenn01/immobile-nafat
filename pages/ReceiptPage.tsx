@@ -276,31 +276,60 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                             padding: 0 !important;
                         }
                         
-                        /* Standard approach: hide everything and show only the receipt */
-                        body > * {
-                            visibility: hidden !important;
+                        /* Hide UI elements */
+                        .no-print, header, aside, nav, button {
+                            display: none !important;
                         }
                         
-                        #printable-receipt, #printable-receipt * {
-                            visibility: visible !important;
+                        /* Reset modal/fixed containers */
+                        .fixed.inset-0 {
+                            position: absolute !important;
+                            display: block !important;
+                            background: white !important;
+                            z-index: auto !important;
+                            overflow: visible !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
                         }
-                        
+
+                        /* Target the card container to be transparent and full width */
+                        .no-print-bg {
+                            background: none !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            max-height: none !important;
+                            display: block !important;
+                            overflow: visible !important;
+                        }
+
+                        .no-print-padding {
+                            padding: 0 !important;
+                            background: none !important;
+                            display: block !important;
+                        }
+
                         #printable-receipt {
                             display: flex !important;
-                            position: fixed !important;
-                            left: 0 !important;
-                            top: 0 !important;
+                            visibility: visible !important;
+                            position: static !important;
                             width: 210mm !important;
                             height: 297mm !important;
                             margin: 0 !important;
                             padding: 0 !important;
-                            border: none !important;
-                            box-shadow: none !important;
+                            page-break-after: avoid;
+                            page-break-before: avoid;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
-                            z-index: 10000 !important;
                         }
-                        
+
+                        /* Ensure transform does not affect print */
+                        .print-transform-none {
+                            transform: none !important;
+                            margin-bottom: 0 !important;
+                        }
+
                         @page {
                             size: A4;
                             margin: 0;
@@ -308,8 +337,8 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                     }
                 `}
             </style>
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl flex flex-col my-4 md:my-8 max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-                <div className="flex-shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b p-4 bg-white rounded-t-lg gap-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl flex flex-col my-4 md:my-8 max-h-[90vh] no-print-bg" onClick={(e) => e.stopPropagation()}>
+                <div className="flex-shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b p-4 bg-white rounded-t-lg gap-4 no-print">
                     <h3 className="text-lg font-semibold text-gray-800">Aperçu du Document</h3>
                     <div className="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
                         <button onClick={handlePrint} className="flex-shrink-0 flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-bold">
@@ -323,10 +352,10 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                         </button>
                     </div>
                 </div>
-                 <div className="overflow-auto p-2 sm:p-4 md:p-8 bg-slate-100/50 flex justify-center">
+                 <div className="overflow-auto p-2 sm:p-4 md:p-8 bg-slate-100/50 flex justify-center no-print-padding">
                     <div 
                         ref={containerRef}
-                        className="shadow-2xl bg-white origin-top transition-transform duration-300" 
+                        className="shadow-2xl bg-white origin-top transition-transform duration-300 print-transform-none" 
                         style={{ 
                             transform: `scale(${scale})`,
                             width: '210mm',
