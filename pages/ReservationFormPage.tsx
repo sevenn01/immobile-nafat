@@ -366,12 +366,10 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                         html, body {
                             margin: 0 !important;
                             padding: 0 !important;
-                            height: 100% !important;
+                            height: auto !important;
                             width: 100% !important;
                             overflow: visible !important;
                             background-color: white !important;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
                         }
 
                         /* 2. Hide Everything by Default */
@@ -392,12 +390,12 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             visibility: visible !important;
                         }
 
-                        /* 4. Force specific UI elements to COMPLETELY DISAPPEAR (no space taken) */
+                        /* 4. Force specific UI elements to COMPLETELY DISAPPEAR */
                         aside, header, nav, footer, .no-print, button, .flex-shrink-0 {
                             display: none !important;
                         }
 
-                        /* 5. Reset layouts that might shift/clip content */
+                        /* 5. Reset layouts */
                         #root, main, .container, .fixed.inset-0 {
                             position: absolute !important;
                             top: 0 !important;
@@ -414,12 +412,12 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             transform: none !important;
                         }
 
-                        /* 6. Specifically ensure background content is hidden */
+                        /* 6. Ensure background content is hidden */
                         main div.container > div:not(.fixed) {
                             display: none !important;
                         }
 
-                        /* 7. Position the target printable document exactly */
+                        /* 7. Position the target document exactly */
                         #reservation-document {
                             display: flex !important;
                             position: absolute !important;
