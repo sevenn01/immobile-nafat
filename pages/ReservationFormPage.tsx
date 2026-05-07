@@ -374,47 +374,36 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             print-color-adjust: exact !important;
                         }
 
-                        /* 2. Hide Everything with absolute precision */
-                        body > *:not(#root) {
-                            display: none !important;
+                        /* 2. Hide Everything by using visibility */
+                        body * {
+                            visibility: hidden !important;
                         }
 
-                        #root > *:not(main),
-                        main > *:not(#print-modal-overlay-res),
-                        #print-modal-overlay-res > *:not(#print-modal-content-res),
-                        #print-modal-content-res > .no-print {
-                            display: none !important;
-                        }
-
-                        /* 3. Force Hierarchy visibility */
-                        #root, main, #print-modal-overlay-res, #print-modal-content-res, #reservation-document-container, #reservation-document, #reservation-document * {
-                            display: block !important;
+                        /* 3. Show ONLY the target document and its contents */
+                        #reservation-document,
+                        #reservation-document * {
                             visibility: visible !important;
-                            opacity: 1 !important;
-                            position: static !important;
-                            width: auto !important;
-                            height: auto !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            box-shadow: none !important;
-                            border: none !important;
                         }
 
-                        /* 4. The target document layout */
+                        /* 4. Force the document to the exact top-left of the first page */
                         #reservation-document {
-                            display: flex !important;
-                            flex-direction: column !important;
-                            position: absolute !important;
+                            position: fixed !important;
                             top: 0 !important;
                             left: 0 !important;
                             width: 210mm !important;
                             height: 297mm !important;
+                            padding: 0mm !important;
                             margin: 0 !important;
-                            padding: 0 !important;
                             box-sizing: border-box !important;
                             background-color: white !important;
-                            z-index: 9999999 !important;
-                            page-break-after: always;
+                            z-index: 1000000 !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                        }
+
+                        /* 5. Ensure no other content blocks the print area */
+                        .no-print, nav, aside, header, button {
+                            display: none !important;
                         }
                     }
                 `}

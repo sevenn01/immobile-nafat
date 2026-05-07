@@ -262,51 +262,42 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                             padding: 0 !important;
                             height: 100% !important;
                             width: 100% !important;
-                            overflow: hidden !important; /* Lock scroll */
+                            overflow: hidden !important;
                             background-color: white !important;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
                         }
 
-                        /* 2. Hide Everything with absolute precision */
-                        body > *:not(#root) {
-                            display: none !important;
+                        /* 2. Hide Everything by using visibility */
+                        body * {
+                            visibility: hidden !important;
                         }
 
-                        #root > *:not(main),
-                        main > *:not(#print-modal-overlay),
-                        #print-modal-overlay > *:not(#print-modal-content),
-                        #print-modal-content > .no-print {
-                            display: none !important;
-                        }
-
-                        /* 3. Force Hierarchy visibility */
-                        #root, main, #print-modal-overlay, #print-modal-content, #printable-receipt-container, #printable-receipt, #printable-receipt * {
-                            display: block !important;
+                        /* 3. Show ONLY the target receipt and its contents */
+                        #printable-receipt,
+                        #printable-receipt * {
                             visibility: visible !important;
-                            opacity: 1 !important;
-                            position: static !important;
-                            width: auto !important;
-                            height: auto !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            box-shadow: none !important;
-                            border: none !important;
                         }
 
-                        /* 4. Target Specific layout */
+                        /* 4. Force the receipt to the exact top-left of the first page */
                         #printable-receipt {
-                            display: flex !important;
-                            flex-direction: column !important;
-                            position: absolute !important;
+                            position: fixed !important;
                             top: 0 !important;
                             left: 0 !important;
                             width: 210mm !important;
                             height: 297mm !important;
-                            padding: 20mm !important; /* Real printed margin */
+                            padding: 15mm !important;
+                            margin: 0 !important;
                             box-sizing: border-box !important;
                             background-color: white !important;
-                            z-index: 9999999 !important;
+                            z-index: 1000000 !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                        }
+                        
+                        /* 5. Ensure no other content blocks the print area */
+                        .no-print, nav, aside, header, button {
+                            display: none !important;
                         }
                     }
                 `}
