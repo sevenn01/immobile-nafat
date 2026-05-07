@@ -104,11 +104,16 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
             const isRental = data?.contract.type === 'rental';
             const filename = `${isRental ? 'quittance' : 'recu'}_${data?.payment.id.substring(data.payment.id.length - 6)}.pdf`;
             const opt = {
-                margin:       0.5,
+                margin:       0,
                 filename:     filename,
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'cm', format: 'a4', orientation: 'portrait' }
+                html2canvas:  { 
+                    scale: 2, 
+                    useCORS: true, 
+                    letterRendering: true,
+                    scrollY: -window.scrollY
+                },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
             window.html2pdf().from(element).set(opt).save();
         } else {
@@ -150,14 +155,19 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
             <div 
                 id="printable-receipt" 
                 ref={receiptRef} 
-                className="bg-white p-8 w-full font-sans flex flex-col text-black relative print:!bg-none print:shadow-none" 
+                className="bg-white w-full font-sans flex flex-col text-black relative print:shadow-none" 
                 style={{ 
                     fontFamily: "'Arial', sans-serif",
-                    minHeight: '297mm'
-                }}
+                    width: '210mm',
+                    height: '297mm',
+                    maxHeight: '297mm',
+                    margin: '0 auto',
+                    WebkitPrintColorAdjust: 'exact',
+                    printColorAdjust: 'exact'
+                } as React.CSSProperties}
             >
                 {/* SPACER FOR TOP LOGO AREA */}
-                <div className="h-[180px] w-full flex-shrink-0 mb-4 flex items-end justify-center">
+                <div className="h-[200px] w-full flex-shrink-0 mb-4 flex items-end justify-center">
                      <div className="text-center">
                         <div className="flex items-baseline justify-center space-x-4">
                             {isRental ? (
@@ -176,7 +186,7 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                     </div>
                 </div>
 
-                <main className="mt-2 flex-grow space-y-4 text-sm px-8">
+                <main className="mt-2 flex-grow space-y-3 text-sm px-14">
                     <div className="space-y-1">
                       <LabeledField frLabel="Dossier N°" arLabel="رقم الملف" value={contract.id.substring(contract.id.length - 6).toUpperCase()} />
                        {isRental ? (
@@ -186,12 +196,12 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                       )}
                     </div>
                     
-                    <div className="space-y-1 pt-4">
+                    <div className="space-y-1 pt-2">
                       <LabeledField frLabel="Nom et Prénom" arLabel="الإسم العائلي و الشخصي" value={client.full_name} />
                       <LabeledField frLabel="Adresse" arLabel="العنوان" value={client.address} />
                     </div>
                     
-                    <div className="space-y-1 pt-4">
+                    <div className="space-y-1 pt-2">
                         <LabeledField frLabel="Objet" arLabel="الموضوع" value={payment.payment_for} />
                     
                          <div className="flex space-x-8">
@@ -205,49 +215,49 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                         <LabeledField frLabel="Date" arLabel="التاريخ" value={new Date(payment.payment_date).toLocaleDateString('fr-FR')} />
                     </div>
 
-                    <div className="pt-4">
+                    <div className="pt-2">
                         <div className="flex justify-between items-center text-sm font-medium">
                            <span className="font-bold text-black">{isRental ? "Montant du Loyer Payé" : "Montant Reçu"}</span>
                            <span className="font-bold text-black" style={{direction: 'rtl'}}>{isRental ? "مبلغ الكراء المؤدى" : "المبلغ المستلم"}</span>
                         </div>
-                        <div className="border-2 border-black w-full text-center py-2 mt-1 font-bold text-lg text-black">{`${payment.amount_dh.toLocaleString('fr-FR')} DH`} </div>
+                        <div className="border-2 border-black w-full text-center py-2 mt-1 font-bold text-lg text-black bg-slate-50/50">{`${payment.amount_dh.toLocaleString('fr-FR')} DH`} </div>
                     </div>
 
                     {!isRental && (
-                        <div className="pt-4 grid grid-cols-2 gap-x-8">
+                        <div className="pt-2 grid grid-cols-2 gap-x-8">
                              <LabeledField frLabel="Total cumulé payé" arLabel="إجمالي المدفوع" value={`${totals.totalPaid.toLocaleString('fr-FR')} DH`} />
                              <LabeledField frLabel="Reste à payer" arLabel="المبلغ المتبقي" value={`${totals.remaining.toLocaleString('fr-FR')} DH`} />
                         </div>
                     )}
 
 
-                    <div className="pt-6">
+                    <div className="pt-4">
                         <h3 className="font-bold text-black text-sm inline-block border-b-2 border-black pb-px">Mode de Paiement <span style={{direction: 'rtl'}} className="ml-4">طريقة الأداء</span></h3>
-                        <div className="mt-4 grid grid-cols-1 gap-y-2 text-sm">
+                        <div className="mt-2 grid grid-cols-1 gap-y-1 text-sm">
                             <PaymentCheckbox label="Espèces" arLabel="نقدا" checked={payment.payment_method === 'especes'} />
                             <PaymentCheckbox label="Virement" arLabel="تحويل" checked={payment.payment_method === 'virement'} />
                             <PaymentCheckbox label="Chèque" arLabel="شيك" checked={payment.payment_method === 'cheque'} />
                         </div>
-                        <div className="mt-4 space-y-1 text-sm">
+                        <div className="mt-2 space-y-1 text-sm">
                             <LabeledField frLabel="Compte / Réf N°" value={getPaymentDetailValue(payment, 'account')} arLabel="حساب رقم" />
                             <LabeledField frLabel="Banque" value={getPaymentDetailValue(payment, 'bank')} arLabel="بنك" />
                         </div>
                     </div>
                 </main>
 
-                <footer className="mt-auto pt-8 flex items-end justify-between space-x-4 text-sm">
-                    <div className="w-1/2 border-2 border-black p-2 text-xs">
+                <footer className="mt-auto pb-12 flex items-end justify-between space-x-4 text-sm px-14">
+                    <div className="w-1/2 border-2 border-black p-2 text-[10px] leading-tight">
                        {isRental 
                          ? "Cette quittance annule tous les reçus qui auraient pu être donnés précédemment pour acomptes versés sur le présent terme."
                          : "Le présent reçu confirme le versement d'un acompte ou d'un solde dans le cadre du contrat de vente référencé ci-dessus."
                        }
                     </div>
-                    <div className="w-1/2 flex justify-end space-x-4">
-                        <div className="border-2 border-black w-40 h-24 p-1">
-                            <p className="font-bold text-center text-xs">{isRental ? "Locataire" : "Acheteur"} <span style={{direction: 'rtl'}}>{isRental ? "المكتري" : "المشتري"}</span></p>
+                    <div className="w-1/2 flex justify-end space-x-2">
+                        <div className="border-2 border-black w-32 h-20 p-1 bg-white/30">
+                            <p className="font-bold text-center text-[10px]">{isRental ? "Locataire" : "Acheteur"} <span style={{direction: 'rtl'}}>{isRental ? "المكتري" : "المشتري"}</span></p>
                         </div>
-                        <div className="border-2 border-black w-40 h-24 p-1">
-                             <p className="font-bold text-center text-xs">Le Responsable <span style={{direction: 'rtl'}}>المسؤول</span></p>
+                        <div className="border-2 border-black w-32 h-20 p-1 bg-white/30">
+                             <p className="font-bold text-center text-[10px]">Le Responsable <span style={{direction: 'rtl'}}>المسؤول</span></p>
                         </div>
                     </div>
                 </footer>
@@ -260,26 +270,38 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
             <style>
                 {`
                     @media print {
-                        body > *, .fixed.inset-0 {
-                            visibility: hidden;
+                        body {
+                            background: white !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
                         }
+                        
+                        /* Standard approach: hide everything and show only the receipt */
+                        body > * {
+                            visibility: hidden !important;
+                        }
+                        
                         #printable-receipt, #printable-receipt * {
-                            visibility: visible;
+                            visibility: visible !important;
                         }
+                        
                         #printable-receipt {
-                           position: absolute;
-                           left: 0;
-                           top: 0;
-                           width: 100%;
-                           height: 100%;
-                           margin: 0;
-                           padding: 1.5rem;
-                           border: none;
-                           box-shadow: none;
-                           color-adjust: exact;
-                           -webkit-print-color-adjust: exact;
+                            display: flex !important;
+                            position: fixed !important;
+                            left: 0 !important;
+                            top: 0 !important;
+                            width: 210mm !important;
+                            height: 297mm !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            border: none !important;
+                            box-shadow: none !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                            z-index: 10000 !important;
                         }
-                         @page {
+                        
+                        @page {
                             size: A4;
                             margin: 0;
                         }

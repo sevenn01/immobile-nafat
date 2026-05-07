@@ -133,7 +133,12 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                 margin:       0,
                 filename:     filename,
                 image:        { type: 'jpeg', quality: 1 },
-                html2canvas:  { scale: 3, useCORS: true, letterRendering: true },
+                html2canvas:  { 
+                    scale: 3, 
+                    useCORS: true, 
+                    letterRendering: true,
+                    scrollY: -window.scrollY
+                },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
             window.html2pdf().from(element).set(opt).save();
@@ -166,6 +171,7 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
 
         return (
             <div 
+                id="reservation-document"
                 ref={printRef} 
                 className="bg-white mx-auto flex flex-col print:m-0 font-sans relative print:shadow-none" 
                 style={{ 
@@ -348,14 +354,44 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
     
     return (
         <div className="fixed inset-0 bg-black/85 z-50 flex justify-center items-start p-4 overflow-auto backdrop-blur-sm">
-             <style>
+            <style>
                 {`
                     @media print {
-                        body > *, .fixed.inset-0 { visibility: hidden; pointer-events: none; }
-                        .modal-print-container, .modal-print-container * { visibility: visible; }
-                        .modal-print-container { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; background: white; }
-                        .no-print { display: none !important; }
-                        @page { size: A4; margin: 0; }
+                        body {
+                            background: white !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                        }
+                        
+                        /* Standard approach: hide everything and show only the document */
+                        body > * {
+                            visibility: hidden !important;
+                        }
+                        
+                        #reservation-document, #reservation-document * {
+                            visibility: visible !important;
+                        }
+                        
+                        #reservation-document {
+                            display: flex !important;
+                            position: fixed !important;
+                            left: 0 !important;
+                            top: 0 !important;
+                            width: 210mm !important;
+                            height: 297mm !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            border: none !important;
+                            box-shadow: none !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                            z-index: 10000 !important;
+                        }
+                        
+                        @page {
+                            size: A4;
+                            margin: 0;
+                        }
                     }
                 `}
             </style>
