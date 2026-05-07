@@ -270,21 +270,21 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
             <style>
                 {`
                     @media print {
+                        /* 1. Hide everything on the body */
                         body {
-                            background: white !important;
+                            visibility: hidden !important;
                             margin: 0 !important;
                             padding: 0 !important;
+                            background: white !important;
                         }
                         
-                        /* Hide UI elements */
-                        .no-print, header, aside, nav, button, .flex-shrink-0 {
-                            display: none !important;
-                        }
-                        
-                        /* Ensure the document is perfectly aligned */
-                        #printable-receipt {
-                            display: flex !important;
+                        /* 2. Show specifically the printable container and all its children */
+                        #printable-receipt, #printable-receipt * {
                             visibility: visible !important;
+                        }
+                        
+                        /* 3. Position the printable area at the absolute top-left of the page */
+                        #printable-receipt {
                             position: fixed !important;
                             left: 0 !important;
                             top: 0 !important;
@@ -292,32 +292,30 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                             height: 297mm !important;
                             margin: 0 !important;
                             padding: 0 !important;
+                            border: none !important;
+                            box-shadow: none !important;
                             background-color: white !important;
-                            box-sizing: border-box !important;
-                            page-break-after: avoid !important;
-                            page-break-before: avoid !important;
+                            z-index: 999999 !important;
+                            /* Reset any shifts/transforms */
+                            transform: none !important;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
-                            z-index: 999999 !important;
                         }
 
-                        /* Reset any transforms or offsets */
-                        .fixed.inset-0, .overflow-auto, .no-print-padding, .no-print-bg, .print-transform-none {
-                            position: static !important;
-                            display: block !important;
-                            transform: none !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            overflow: visible !important;
+                        /* 4. Hide UI containers that might interfere with layout/clicks during print */
+                        .no-print, header, aside, .fixed.inset-0, .overflow-auto {
                             background: none !important;
                             box-shadow: none !important;
+                            border: none !important;
                         }
 
-                        /* Ensure no scale transform is active during print */
-                        .origin-top {
-                            transform: none !important;
+                        /* Ensure no parent containers force backgrounds or borders */
+                        #root, main, .container {
+                            background: none !important;
+                            border: none !important;
+                            box-shadow: none !important;
                         }
-
+                        
                         @page {
                             size: A4;
                             margin: 0;

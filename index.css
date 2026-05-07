@@ -66,31 +66,4 @@
   .no-print {
     display: none !important;
   }
-  
-  .animate-slide-up-from-bottom {
-    animation: none !important;
-    transform: none !important;
-    opacity: 1 !important;
-  }
-  
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    height: 100% !important;
-    width: 100% !important;
-    background: white !important;
-    overflow: visible !important;
-  }
-  
-  #root {
-    height: auto !important;
-    width: auto !important;
-    overflow: visible !important;
-  }
-  
-  main, .overflow-y-auto {
-    overflow: visible !important;
-    height: auto !important;
-    display: block !important;
-  }
 }
