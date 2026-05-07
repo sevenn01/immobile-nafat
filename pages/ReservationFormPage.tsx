@@ -357,19 +357,28 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
             <style>
                 {`
                     @media print {
-                        /* 1. Reset everything to hidden */
-                        body * {
+                        /* 1. Hide everything by default */
+                        html, body, #root, main {
                             visibility: hidden !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            height: auto !important;
+                            width: auto !important;
+                            overflow: visible !important;
+                            background: white !important;
                         }
                         
-                        /* 2. Show specifically the printable container and all its descendants */
+                        /* 2. Show specifically the printable container and all its children */
                         #reservation-document, #reservation-document * {
                             visibility: visible !important;
+                            opacity: 1 !important;
                         }
                         
-                        /* 3. Force the printable area to the top-left */
+                        /* 3. Position the printable area at the absolute top-left of the page */
                         #reservation-document {
-                            position: absolute !important;
+                            visibility: visible !important;
+                            display: block !important;
+                            position: fixed !important;
                             left: 0 !important;
                             top: 0 !important;
                             width: 210mm !important;
@@ -379,35 +388,35 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             border: none !important;
                             box-shadow: none !important;
                             background-color: white !important;
-                            z-index: 999999 !important;
+                            z-index: 9999999 !important; /* Extremely high z-index */
                             transform: none !important;
-                            display: flex !important;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
                         }
 
-                        /* 4. Ensure parent containers don't clip or shift the document */
-                        html, body, #root, main, .fixed, .overflow-auto, .modal-print-container {
-                            overflow: visible !important;
-                            height: auto !important;
-                            width: auto !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            background: none !important;
-                            border: none !important;
-                            box-shadow: none !important;
-                            transform: none !important;
+                        /* 4. Ensure ancestors don't interfere */
+                        .fixed, .overflow-auto, .modal-print-container {
+                            visibility: visible !important;
                             position: static !important;
+                            overflow: visible !important;
+                            transform: none !important;
+                            background: none !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
                         }
                         
                         @page {
-                            size: A4;
+                            size: A4 portrait;
                             margin: 0;
                         }
 
-                        /* Hide standard UI elements just in case visibility trick misses them */
-                        .no-print, header, aside, nav, button {
+                        /* 5. Force hide absolutely everything else */
+                        .no-print, header, aside, nav, button, .flex-shrink-0 {
                             display: none !important;
+                            visibility: hidden !important;
+                            opacity: 0 !important;
                         }
                     }
                 `}
