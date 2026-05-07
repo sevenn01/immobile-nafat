@@ -293,7 +293,7 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
 
                         /* 4. Position the printable receipt exactly at the top */
                         #printable-receipt {
-                            position: absolute !important;
+                            position: fixed !important;
                             top: 0 !important;
                             left: 0 !important;
                             width: 210mm !important;
@@ -305,14 +305,14 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                             box-shadow: none !important;
                             display: flex !important;
                             flex-direction: column !important;
-                            z-index: 99999 !important;
+                            z-index: 9999999 !important;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
                             visibility: visible !important;
                         }
 
                         /* 5. Ensure parent containers don't interfere with rendering */
-                        #root, main, div, section {
+                        #root, main, .no-print-bg, .no-print-padding {
                             position: static !important;
                             display: block !important;
                             visibility: visible !important;
@@ -331,8 +331,14 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                         body * {
                             visibility: hidden;
                         }
-                        #root, #root *, main, main *, #printable-receipt, #printable-receipt * {
+                        #root, #root *, main, main *, .no-print-bg, .no-print-bg *, .no-print-padding, .no-print-padding *, #printable-receipt, #printable-receipt * {
                             visibility: visible;
+                        }
+                        
+                        /* 7. Re-hide standard UI and non-printable elements that might be shown by step 6 */
+                        .no-print, header, aside, nav, button, .flex-shrink-0 {
+                            display: none !important;
+                            visibility: hidden !important;
                         }
                     }
                 `}
