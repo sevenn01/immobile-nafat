@@ -73,17 +73,19 @@
     opacity: 1 !important;
   }
   
-  body, #root {
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 100% !important;
+    width: 100% !important;
     background: white !important;
     overflow: visible !important;
-    height: auto !important;
-    width: auto !important;
   }
   
-  /* Reset some flex layouts that might break printing */
-  .flex.h-screen {
-    display: block !important;
+  #root {
     height: auto !important;
+    width: auto !important;
+    overflow: visible !important;
   }
   
   main, .overflow-y-auto {

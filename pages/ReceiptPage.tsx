@@ -277,57 +277,45 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                         }
                         
                         /* Hide UI elements */
-                        .no-print, header, aside, nav, button {
+                        .no-print, header, aside, nav, button, .flex-shrink-0 {
                             display: none !important;
                         }
                         
-                        /* Reset modal/fixed containers */
-                        .fixed.inset-0 {
-                            position: absolute !important;
-                            display: block !important;
-                            background: white !important;
-                            z-index: auto !important;
-                            overflow: visible !important;
-                            padding: 0 !important;
-                            margin: 0 !important;
-                        }
-
-                        /* Target the card container to be transparent and full width */
-                        .no-print-bg {
-                            background: none !important;
-                            box-shadow: none !important;
-                            border: none !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            max-height: none !important;
-                            display: block !important;
-                            overflow: visible !important;
-                        }
-
-                        .no-print-padding {
-                            padding: 0 !important;
-                            background: none !important;
-                            display: block !important;
-                        }
-
+                        /* Ensure the document is perfectly aligned */
                         #printable-receipt {
                             display: flex !important;
                             visibility: visible !important;
-                            position: static !important;
+                            position: fixed !important;
+                            left: 0 !important;
+                            top: 0 !important;
                             width: 210mm !important;
                             height: 297mm !important;
                             margin: 0 !important;
                             padding: 0 !important;
-                            page-break-after: avoid;
-                            page-break-before: avoid;
+                            background-color: white !important;
+                            box-sizing: border-box !important;
+                            page-break-after: avoid !important;
+                            page-break-before: avoid !important;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
+                            z-index: 999999 !important;
                         }
 
-                        /* Ensure transform does not affect print */
-                        .print-transform-none {
+                        /* Reset any transforms or offsets */
+                        .fixed.inset-0, .overflow-auto, .no-print-padding, .no-print-bg, .print-transform-none {
+                            position: static !important;
+                            display: block !important;
                             transform: none !important;
-                            margin-bottom: 0 !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            overflow: visible !important;
+                            background: none !important;
+                            box-shadow: none !important;
+                        }
+
+                        /* Ensure no scale transform is active during print */
+                        .origin-top {
+                            transform: none !important;
                         }
 
                         @page {
