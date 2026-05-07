@@ -279,42 +279,64 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                         html, body {
                             margin: 0 !important;
                             padding: 0 !important;
-                            height: auto !important;
+                            height: 100% !important;
                             width: 100% !important;
                             overflow: visible !important;
                             background-color: white !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+
+                        /* 2. Hide Everything by Default */
+                        body * {
                             visibility: hidden !important;
                         }
 
-                        /* 2. Show only the printable receipt and its contents */
-                        #printable-receipt, #printable-receipt * {
+                        /* 3. Show ONLY the Path to the Receipt */
+                        #root, 
+                        #root *, 
+                        main, 
+                        main *, 
+                        .container, 
+                        .container *, 
+                        .fixed.inset-0, 
+                        #printable-receipt, 
+                        #printable-receipt * {
                             visibility: visible !important;
                         }
 
-                        /* 3. Reset all parent containers to not clip or shift content */
-                        #root, main, .container, .fixed, .no-print-bg, .no-print-padding {
-                            position: static !important;
-                            display: block !important;
-                            width: auto !important;
-                            height: auto !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            overflow: visible !important;
-                            transform: none !important;
-                            background: none !important;
-                            box-shadow: none !important;
-                            border: none !important;
-                            visibility: visible !important;
-                        }
-
-                        /* 4. Hide all siblings of the receipt path explicitly to be safe */
-                        .no-print, header, aside, nav, button, .flex-shrink-0 {
+                        /* 4. Force specific UI elements to COMPLETELY DISAPPEAR (no space taken) */
+                        aside, header, nav, footer, .no-print, button, .flex-shrink-0 {
                             display: none !important;
                         }
 
-                        /* 5. The target printable document positioning */
+                        /* 5. Reset layouts that might shift/clip content */
+                        #root, main, .container, .fixed.inset-0 {
+                            position: absolute !important;
+                            top: 0 !important;
+                            left: 0 !important;
+                            width: 100% !important;
+                            height: 100% !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            display: block !important;
+                            overflow: visible !important;
+                            background: white !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            transform: none !important;
+                        }
+
+                        /* 6. Specifically ensure the background page content (siblings of the modal) is hidden */
+                        /* We assume the modal is a child of some container in main */
+                        main div.container > div:not(.fixed) {
+                            display: none !important;
+                        }
+
+                        /* 7. Position the target printable document exactly */
                         #printable-receipt {
                             display: flex !important;
+                            flex-direction: column !important;
                             position: absolute !important;
                             top: 0 !important;
                             left: 0 !important;
@@ -323,9 +345,7 @@ const ReceiptPage: React.FC<ReceiptProps> = ({ paymentId, onClose }) => {
                             margin: 0 !important;
                             padding: 0 !important;
                             background-color: white !important;
-                            z-index: 99999 !important;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
+                            z-index: 9999999 !important;
                             box-shadow: none !important;
                             border: none !important;
                         }
