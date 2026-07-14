@@ -50,6 +50,8 @@ export interface Project {
   updated_by?: string;
   num_floors: number;
   has_rdc: boolean;
+  num_apartments?: number;
+  num_rdc?: number;
   registered_count?: number;
 }
 
@@ -71,6 +73,7 @@ export interface Apartment {
   owner_name: string;
   description: string;
   current_contract_id?: string;
+  titre?: string;
   created_at: string;
   updated_at: string;
   created_by?: string;

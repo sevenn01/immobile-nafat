@@ -3,12 +3,13 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getProjects, getApartments, addApartment, deleteApartment, updateApartment, getContracts, getClients, addContract } from '../services/api';
 import { Project, Apartment, ApartmentStatus, Contract, Client, ContractStatus } from '../types';
-import { PlusIcon, EditIcon, TrashIcon, HomeIcon, GarageIcon, GridIcon, ListIcon, LockIcon, UnlockIcon, BuildingIcon } from '../components/icons/Icons';
+import { PlusIcon, EditIcon, TrashIcon, HomeIcon, GarageIcon, GridIcon, ListIcon, LockIcon, UnlockIcon, BuildingIcon, FileTextIcon } from '../components/icons/Icons';
 import Modal from '../components/Modal';
 import { useAuth } from '../auth/AuthContext';
 import ConfirmationModal from '../components/ConfirmationModal';
 import ApartmentCard from '../components/ApartmentCard';
 import Notification from '../components/Notification';
+import { PropertyPdfModal } from '../components/PropertyPdfModal';
 
 const ProjectDetailsPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -29,6 +30,7 @@ const ProjectDetailsPage: React.FC = () => {
   const { user } = useAuth();
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [apartmentToDelete, setApartmentToDelete] = useState<Apartment | null>(null);
+  const [pdfApartment, setPdfApartment] = useState<Apartment | null>(null);
   const navigate = useNavigate();
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -119,6 +121,7 @@ const ProjectDetailsPage: React.FC = () => {
           owner_name: formData.get('owner_name') as string || 'Nafat Immobilier',
           description: formData.get('description') as string || '',
           floor: selectedFloor || "RDC",
+          titre: (formData.get('titre') as string) || '',
       };
 
       if (propertyType === 'apartment') {
@@ -220,7 +223,19 @@ const ProjectDetailsPage: React.FC = () => {
                 {viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {floorApts.map((apt) => (
-                            <ApartmentCard key={apt.id} apartment={apt} project={project} isLocked={manualLockStates[apt.id] !== undefined ? manualLockStates[apt.id] : (apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold)} onToggleLock={() => setManualLockStates(p => ({...p, [apt.id]: !p[apt.id]}))} onEdit={openEditModal} onDelete={handleDelete} onRent={() => navigate('/contrats')} onSell={() => navigate('/contrats')} onViewContractHolder={handleViewContractHolder} />
+                            <ApartmentCard 
+                                key={apt.id} 
+                                apartment={apt} 
+                                project={project} 
+                                isLocked={manualLockStates[apt.id] !== undefined ? manualLockStates[apt.id] : (apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold)} 
+                                onToggleLock={() => setManualLockStates(p => ({...p, [apt.id]: !p[apt.id]}))} 
+                                onEdit={openEditModal} 
+                                onDelete={handleDelete} 
+                                onRent={() => navigate('/reservations')} 
+                                onSell={() => navigate('/reservations')} 
+                                onViewContractHolder={handleViewContractHolder} 
+                                onViewPdf={(a) => setPdfApartment(a)}
+                            />
                         ))}
                     </div>
                 ) : (
@@ -230,7 +245,16 @@ const ProjectDetailsPage: React.FC = () => {
                                 <tr><th className="px-6 py-3 text-left">Nom</th><th className="px-6 py-3 text-left">Usage</th><th className="px-6 py-3 text-left">Prix/Loyer</th><th className="px-6 py-3 text-center">Actions</th></tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">{floorApts.map(apt => (
-                                <tr key={apt.id} className="hover:bg-gray-50"><td className="px-6 py-4 font-bold">{apt.name}</td><td className="px-6 py-4 uppercase text-[10px] font-bold">{apt.intended_for === 'sale' ? 'Vente' : 'Loc'}</td><td className="px-6 py-4 font-bold">{apt.intended_for === 'sale' ? apt.sale_price_dh?.toLocaleString() : apt.price_dh.toLocaleString()} DH</td><td className="px-6 py-4 flex justify-center space-x-3"><EditIcon className="w-5 h-5 cursor-pointer hover:text-green-600" onClick={() => openEditModal(apt)} /><TrashIcon className="w-5 h-5 cursor-pointer hover:text-red-600" onClick={() => handleDelete(apt)} /></td></tr>
+                                <tr key={apt.id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4 font-bold">{apt.name}</td>
+                                    <td className="px-6 py-4 uppercase text-[10px] font-bold">{apt.intended_for === 'sale' ? 'Vente' : 'Loc'}</td>
+                                    <td className="px-6 py-4 font-bold">{apt.intended_for === 'sale' ? apt.sale_price_dh?.toLocaleString() : apt.price_dh.toLocaleString()} DH</td>
+                                    <td className="px-6 py-4 flex justify-center items-center space-x-3">
+                                        <FileTextIcon className="w-5 h-5 cursor-pointer hover:text-green-600" onClick={() => setPdfApartment(apt)} title="Fiche Technique / Dossier PDF" />
+                                        <EditIcon className="w-5 h-5 cursor-pointer hover:text-green-600" onClick={() => openEditModal(apt)} />
+                                        <TrashIcon className="w-5 h-5 cursor-pointer hover:text-red-600" onClick={() => handleDelete(apt)} />
+                                    </td>
+                                </tr>
                             ))}</tbody>
                         </table>
                     </div>
@@ -251,6 +275,7 @@ const ProjectDetailsPage: React.FC = () => {
                 <div className="md:col-span-2"><label className="block text-sm font-bold text-gray-700">Type</label><div className="flex space-x-2 mt-2"><button type="button" onClick={() => setPropertyType('apartment')} className={`flex-1 py-2 border rounded-lg font-bold text-sm ${propertyType === 'apartment' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600'}`}>Logement</button><button type="button" onClick={() => setPropertyType('garage')} className={`flex-1 py-2 border rounded-lg font-bold text-sm ${propertyType === 'garage' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600'}`}>Garage/Local</button></div></div>
                 <div><label className="block text-sm font-bold text-gray-700">Étage</label><select value={selectedFloor} onChange={e => setSelectedFloor(e.target.value)} required className={inputClasses}><option value="" disabled>Choisir l'étage</option>{floorOptions.map(f => <option key={f} value={f}>{f === 'RDC' ? 'Rez-de-chaussée' : `Étage ${f}`}</option>)}</select></div>
                 <div><label className="block text-sm font-bold text-gray-700">Nom / Référence <span className="text-[10px] text-green-600 font-bold">(Auto)</span></label><input type="text" value={manualName} onChange={e => setManualName(e.target.value)} required className={inputClasses} /></div>
+                <div className="md:col-span-2"><label className="block text-sm font-bold text-gray-700">Titre de l'appartement (Titre Foncier / Land Title)</label><input type="text" name="titre" defaultValue={editingApartment?.titre || ''} className={inputClasses} placeholder="Ex: TF 12345/66 ou En cours..." /></div>
                 
                 {propertyType === 'apartment' && (<>
                     <div><label className="block text-sm font-bold text-gray-700">Pièces</label><input type="number" name="rooms" defaultValue={editingApartment?.rooms || 0} className={inputClasses} /></div>
@@ -272,6 +297,14 @@ const ProjectDetailsPage: React.FC = () => {
 
         {isConfirmModalOpen && apartmentToDelete && (
             <ConfirmationModal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} onConfirm={handleConfirmDelete} title="Supprimer ?" message={`Voulez-vous supprimer "${apartmentToDelete.name}" ?`} />
+        )}
+
+        {pdfApartment && (
+            <PropertyPdfModal 
+                apartment={pdfApartment} 
+                project={project || undefined} 
+                onClose={() => setPdfApartment(null)} 
+            />
         )}
     </div>
   );

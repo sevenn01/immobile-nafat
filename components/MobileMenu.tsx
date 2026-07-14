@@ -71,10 +71,16 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
                         </NavLink>
                     )}
                     {canView('contracts') && (
-                        <NavLink to="/contrats" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass} mt-2`}>
-                            <FileTextIcon className="w-5 h-5" />
-                            <span className="mx-4 font-medium">Contrats</span>
-                        </NavLink>
+                        <>
+                            <NavLink to="/reservations" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass} mt-2`}>
+                                <FileTextIcon className="w-5 h-5" />
+                                <span className="mx-4 font-medium">Réservations</span>
+                            </NavLink>
+                            <NavLink to="/contrats" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass} mt-2`}>
+                                <FileTextIcon className="w-5 h-5 text-indigo-600" />
+                                <span className="mx-4 font-medium">Contrats (Définitifs)</span>
+                            </NavLink>
+                        </>
                     )}
                     {canView('payments') && (
                         <>

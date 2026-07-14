@@ -249,7 +249,7 @@ const ContractsPage: React.FC = () => {
         {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
         
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Dossiers</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Dossiers de Réservation</h2>
             <button onClick={() => setIsTypeSelectionModalOpen(true)} className="w-full md:w-auto justify-center px-5 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all flex items-center shadow-lg font-bold active:scale-95 text-sm md:text-base">
                 <PlusIcon className="w-5 h-5 mr-1" />
                 Nouveau

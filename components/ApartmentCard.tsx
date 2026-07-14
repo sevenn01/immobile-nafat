@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Apartment, ApartmentStatus, Project } from '../types';
-import { HomeIcon, GarageIcon, EditIcon, TrashIcon, BedIcon, BathIcon, SunIcon, FlameIcon, LockIcon, UnlockIcon, BuildingIcon } from './icons/Icons';
+import { HomeIcon, GarageIcon, EditIcon, TrashIcon, BedIcon, BathIcon, SunIcon, FlameIcon, LockIcon, UnlockIcon, BuildingIcon, FileTextIcon } from './icons/Icons';
 
 interface ApartmentCardProps {
   apartment: Apartment;
@@ -11,30 +11,33 @@ interface ApartmentCardProps {
   onEdit: (apartment: Apartment) => void;
   onDelete: (apartment: Apartment) => void;
   onRent: (apartment: Apartment) => void;
+  onSelect?: (id: string) => void;
+  isSelected?: boolean;
   onSell: (apartment: Apartment) => void;
   onViewContractHolder: (apartment: Apartment) => void;
+  onViewPdf?: (apartment: Apartment) => void;
 }
 
 const translateStatus = (status: ApartmentStatus, intendedFor: 'sale' | 'rental') => {
     switch (status) {
-        case ApartmentStatus.Available: return intendedFor === 'sale' ? 'À Vendre' : 'Disponible';
+        case ApartmentStatus.Available: return intendedFor === 'sale' ? 'A VENDRE' : 'Disponible';
         case ApartmentStatus.Rented: return 'Loué';
         case ApartmentStatus.Maintenance: return 'En Maintenance';
-        case ApartmentStatus.ForSale: return 'À Vendre';
-        case ApartmentStatus.Sold: return 'Vendu';
+        case ApartmentStatus.ForSale: return 'A VENDRE';
+        case ApartmentStatus.Sold: return intendedFor === 'sale' ? 'RESERVE' : 'Vendu';
         default: return status;
     }
 };
 
 const getStatusClasses = (status: ApartmentStatus, intendedFor: 'sale' | 'rental') => {
   if (status === ApartmentStatus.Available || status === ApartmentStatus.ForSale) {
-      return intendedFor === 'sale' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800';
+      return intendedFor === 'sale' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-green-100 text-green-700 border border-green-200';
   }
   switch (status) {
-    case ApartmentStatus.Rented: return 'bg-blue-100 text-blue-800';
-    case ApartmentStatus.Maintenance: return 'bg-yellow-100 text-yellow-800';
-    case ApartmentStatus.Sold: return 'bg-gray-200 text-gray-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case ApartmentStatus.Rented: return 'bg-blue-100 text-blue-700 border border-blue-200';
+    case ApartmentStatus.Maintenance: return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
+    case ApartmentStatus.Sold: return intendedFor === 'sale' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-gray-150 text-gray-700 border border-gray-250';
+    default: return 'bg-gray-100 text-gray-700';
   }
 };
 
@@ -58,7 +61,7 @@ const ApartmentAmenity: React.FC<{ icon: React.ReactNode; label: string; availab
     );
 }
 
-const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLocked = false, onToggleLock, onEdit, onDelete, onRent, onSell, onViewContractHolder }) => {
+const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLocked = false, onToggleLock, onEdit, onDelete, onRent, onSelect, isSelected = false, onSell, onViewContractHolder, onViewPdf }) => {
 
   const handleToggleLock = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -120,6 +123,15 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLoc
       <div className="relative flex flex-col h-full">
         <div className="flex justify-between items-start mb-1">
           <div className="flex items-center space-x-2 text-green-600">
+            {onSelect && (
+              <input 
+                type="checkbox" 
+                checked={isSelected} 
+                onChange={() => onSelect(apartment.id)}
+                className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer accent-green-600 mr-1"
+                onClick={e => e.stopPropagation()}
+              />
+            )}
             <HomeIcon className="w-4 h-4" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">{project?.project_name || 'Projet'}</span>
           </div>
@@ -134,6 +146,15 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLoc
                   {isLocked ? <LockIcon className="w-4 h-4" /> : <UnlockIcon className="w-4 h-4" />}
               </button>
             )}
+            {onViewPdf && (
+              <button 
+                onClick={() => onViewPdf(apartment)} 
+                className="p-2 rounded-xl text-gray-300 hover:text-green-600 transition-all bg-gray-50/50 hover:bg-green-50 focus:outline-none"
+                title="Fiche Technique / Dossier PDF"
+              >
+                <FileTextIcon className="w-4 h-4" />
+              </button>
+            )}
             <button onClick={() => onEdit(apartment)} className="p-2 rounded-xl text-gray-300 hover:text-blue-600 transition-all bg-gray-50/50 hover:bg-blue-50 focus:outline-none">
                 <EditIcon className="w-4 h-4" />
             </button>
@@ -146,11 +167,7 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLoc
         <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-green-700 transition-colors truncate">{apartment.name}</h3>
 
         <div className="mb-6">
-            <span className={`px-4 py-1.5 text-[10px] font-semibold rounded-full uppercase tracking-widest ${
-                apartment.status === ApartmentStatus.Available || apartment.status === ApartmentStatus.ForSale 
-                    ? (apartment.intended_for === 'sale' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700')
-                    : 'bg-gray-100 text-gray-600'
-            }`}>
+            <span className={`px-4 py-1.5 text-[10px] font-semibold rounded-full uppercase tracking-widest ${getStatusClasses(apartment.status, apartment.intended_for)}`}>
               {translateStatus(apartment.status, apartment.intended_for)}
             </span>
         </div>
@@ -179,6 +196,12 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLoc
                         value={apartment.bathroom} 
                     />
                 </>
+            )}
+            {apartment.titre && (
+                <div className="col-span-2 flex items-center space-x-2 text-[11px] font-bold px-3 py-1.5 rounded-xl border border-indigo-100 bg-indigo-50/50 text-indigo-700 w-fit">
+                    <span className="text-indigo-400 uppercase tracking-wider text-[9px]">TF:</span>
+                    <span>{apartment.titre}</span>
+                </div>
             )}
         </div>
 

@@ -7,6 +7,7 @@ import Modal from '../components/Modal';
 import { useAuth } from '../auth/AuthContext';
 import { CoinsIcon, PrinterIcon, FileTextIcon, XCircleIcon, PaperclipIcon, ClockIcon, TrashIcon } from '../components/icons/Icons';
 import ReceiptPage from './ReceiptPage';
+import ReservationFormPage from './ReservationFormPage';
 
 // Helper to compress image before saving to Firestore (1MB limit)
 const compressImage = (base64Str: string, maxWidth = 1000, quality = 0.7): Promise<string> => {
@@ -67,6 +68,9 @@ const ClientDetailsPage: React.FC = () => {
     const [fileInputKey, setFileInputKey] = useState(0);
     const { user } = useAuth();
     const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null);
+    const [reservationContractId, setReservationContractId] = useState<string | null>(null);
+    const [paymentForOption, setPaymentForOption] = useState<string>('avance');
+    const [customPaymentFor, setCustomPaymentFor] = useState<string>('');
 
     const fetchData = useCallback(async () => {
         if (!clientId) return;
@@ -76,9 +80,42 @@ const ClientDetailsPage: React.FC = () => {
                 getClients(), getPayments(), getContracts(), getApartments()
             ]);
             const currentClient = clientsData.find(c => c.id === clientId) || null;
-            // Sorting to see most recent first, but also ensuring initial payments are visible
-            const clientPayments = paymentsData.filter(p => p.client_id === clientId)
-                .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
+            
+            const rawClientPayments = paymentsData.filter(p => p.client_id === clientId);
+            
+            // Identify initial payments (oldest paid payment per contract)
+            const contractToInitialPaymentId = new Map<string, string>();
+            const contractsMap = new Map<string, typeof rawClientPayments>();
+            
+            rawClientPayments.forEach(p => {
+                if (p.contract_id) {
+                    if (!contractsMap.has(p.contract_id)) {
+                        contractsMap.set(p.contract_id, []);
+                    }
+                    contractsMap.get(p.contract_id)!.push(p);
+                }
+            });
+            
+            contractsMap.forEach((pList, contractId) => {
+                const paidPayments = pList.filter(p => p.status === PaymentStatus.Paid);
+                const candidates = paidPayments.length > 0 ? paidPayments : pList;
+                const sortedCandidates = [...candidates].sort((a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
+                if (sortedCandidates.length > 0) {
+                    contractToInitialPaymentId.set(contractId, sortedCandidates[0].id);
+                }
+            });
+
+            // Sort so that initial payments are strictly on top, followed by subsequent payments sorted chronologically
+            const clientPayments = [...rawClientPayments].sort((a, b) => {
+                const aIsInitial = contractToInitialPaymentId.get(a.contract_id) === a.id;
+                const bIsInitial = contractToInitialPaymentId.get(b.contract_id) === b.id;
+                
+                if (aIsInitial && !bIsInitial) return -1;
+                if (!aIsInitial && bIsInitial) return 1;
+                
+                return new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime();
+            });
+
             const clientContracts = contractsData.filter(c => c.client_id === clientId);
             
             setClient(currentClient);
@@ -89,6 +126,13 @@ const ClientDetailsPage: React.FC = () => {
     }, [clientId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+
+    const isInitialPayment = useCallback((payment: Payment) => {
+        const contractPayments = payments.filter(pay => pay.contract_id === payment.contract_id && pay.status === PaymentStatus.Paid);
+        // Sort chronologically by date
+        const sorted = [...contractPayments].sort((a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
+        return sorted.length > 0 && sorted[0].id === payment.id;
+    }, [payments]);
     
     const { activeContracts, archivedContracts } = useMemo(() => {
         const withDetails = contracts.map(contract => {
@@ -107,6 +151,12 @@ const ClientDetailsPage: React.FC = () => {
         setProofBase64('');
         setPaymentMethod('especes');
         setFileInputKey(k => k + 1);
+        
+        // Smart default for payment object: if contract has no payments, default to 'Versement initial'
+        const hasExistingPayments = payments.some(p => p.contract_id === contract.id && p.status === PaymentStatus.Paid);
+        setPaymentForOption(hasExistingPayments ? 'avance' : 'Versement initial');
+        setCustomPaymentFor('');
+        
         setIsPaymentModalOpen(true);
     }
     
@@ -133,12 +183,13 @@ const ClientDetailsPage: React.FC = () => {
         e.preventDefault();
         if (!user || !selectedContract) return;
         const formData = new FormData(e.currentTarget);
+        const finalPaymentFor = paymentForOption === 'autre' ? customPaymentFor : paymentForOption;
         const paymentData: Partial<Payment> = {
             contract_id: selectedContract.id, 
             client_id: selectedContract.client_id,
             amount_dh: Number(formData.get('amount_dh')),
             payment_date: formData.get('payment_date') as string,
-            payment_for: formData.get('payment_for') as string,
+            payment_for: finalPaymentFor || "avance",
             status: PaymentStatus.Paid,
             payment_method: paymentMethod,
             cheque_number: formData.get('ref_num') as string,
@@ -203,8 +254,8 @@ const ClientDetailsPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                <div className="lg:col-span-2 space-y-10">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
+                <div className="lg:col-span-3 space-y-10">
                     <section>
                         <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-4 md:mb-5 px-2 flex items-center uppercase tracking-tight">
                             <FileTextIcon className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-indigo-600" /> Dossiers Actifs
@@ -265,7 +316,7 @@ const ClientDetailsPage: React.FC = () => {
                                             <th className="px-4 md:px-6 py-4 text-left">Montant</th>
                                             <th className="hidden sm:table-cell px-4 md:px-6 py-4 text-left">Objet</th>
                                             <th className="px-4 md:px-6 py-4 text-center">Statut</th>
-                                            <th className="px-4 md:px-6 py-4 text-center">Reçu</th>
+                                            <th className="px-4 md:px-6 py-4 text-center">Documents</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50 font-semibold text-xs md:text-sm">
@@ -278,15 +329,32 @@ const ClientDetailsPage: React.FC = () => {
                                                 </td>
                                                 <td className="hidden sm:table-cell px-4 md:px-6 py-4 md:py-4 text-slate-500 font-medium">
                                                     {p.payment_for}
-                                                    {p.payment_for.toLowerCase().includes('initial') && (
-                                                        <span className="ml-2 px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[8px] rounded border border-blue-100">DÉPÔT</span>
+                                                    {isInitialPayment(p) && (
+                                                        <span className="ml-2 px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[8px] rounded border border-blue-100">INITIAL</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 md:px-6 py-4 text-center"><span className={getPaymentStatusBadge(p.status).replace('text-[10px]', 'text-[8px] md:text-[10px]')}>{p.status}</span></td>
                                                 <td className="px-4 md:px-6 py-4 text-center">
-                                                    <button onClick={() => setReceiptPaymentId(p.id)} className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors" title="Imprimer le reçu">
-                                                        <PrinterIcon className="w-5 h-5 mx-auto" />
-                                                    </button>
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        {isInitialPayment(p) && (
+                                                            <button 
+                                                                onClick={() => setReservationContractId(p.contract_id)} 
+                                                                className="p-2 md:px-2.5 md:py-1.5 text-[10px] font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg flex items-center justify-center transition duration-150 shadow-md active:scale-95 whitespace-nowrap" 
+                                                                title="Accéder au Bon de réservation"
+                                                            >
+                                                                <FileTextIcon className="w-4 h-4 md:w-3.5 md:h-3.5 md:mr-1 shrink-0" />
+                                                                <span className="hidden md:inline">Bon Réservation</span>
+                                                            </button>
+                                                        )}
+                                                        <button 
+                                                            onClick={() => setReceiptPaymentId(p.id)} 
+                                                            className="p-2 md:px-2.5 md:py-1.5 text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center justify-center transition duration-150 shadow-sm active:scale-95 whitespace-nowrap" 
+                                                            title="Imprimer le reçu"
+                                                        >
+                                                            <PrinterIcon className="w-4 h-4 md:w-3.5 md:h-3.5 md:mr-1 shrink-0" />
+                                                            <span className="hidden md:inline">Reçu</span>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         )) : (
@@ -346,7 +414,27 @@ const ClientDetailsPage: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1">Objet du versement</label>
-                            <input type="text" name="payment_for" required className={inputClasses} placeholder="ex: Solde dossier vente" />
+                            <select 
+                                value={paymentForOption} 
+                                onChange={(e) => setPaymentForOption(e.target.value)} 
+                                className={inputClasses}
+                            >
+                                <option value="Versement initial">Versement initial</option>
+                                <option value="avance">Avance</option>
+                                <option value="Solde dossier">Solde dossier</option>
+                                <option value="Loyer mensuel">Loyer mensuel</option>
+                                <option value="autre">Autre (Saisir manuellement)...</option>
+                            </select>
+                            {paymentForOption === 'autre' && (
+                                <input 
+                                    type="text" 
+                                    value={customPaymentFor} 
+                                    onChange={(e) => setCustomPaymentFor(e.target.value)} 
+                                    required 
+                                    className={`${inputClasses} mt-2 animate-slide-up-from-bottom`} 
+                                    placeholder="Préciser l'objet..." 
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -402,6 +490,7 @@ const ClientDetailsPage: React.FC = () => {
             </Modal>
             
             {receiptPaymentId && <ReceiptPage paymentId={receiptPaymentId} onClose={() => setReceiptPaymentId(null)} />}
+            {reservationContractId && <ReservationFormPage contractId={reservationContractId} onClose={() => setReservationContractId(null)} />}
         </div>
     );
 };

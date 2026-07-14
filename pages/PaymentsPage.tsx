@@ -75,6 +75,8 @@ const PaymentsPage: React.FC = () => {
   const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null);
   const [selectedContractId, setSelectedContractId] = useState<string>('');
   const [paymentFor, setPaymentFor] = useState('');
+  const [paymentForOption, setPaymentForOption] = useState<string>('avance');
+  const [customPaymentFor, setCustomPaymentFor] = useState<string>('');
   const [currentPaymentAmount, setCurrentPaymentAmount] = useState<string>('');
   
   // Confirmation state for deleting whole payment
@@ -102,9 +104,23 @@ const PaymentsPage: React.FC = () => {
   useEffect(() => {
     if (selectedContractDetails) {
         setCurrentPaymentAmount(String(selectedContractDetails.remaining));
-        setPaymentFor(selectedContractDetails.contract.type === 'sale' ? "Versement dossier vente" : "Loyer mensuel");
+        const hasExistingPayments = payments.some(p => p.contract_id === selectedContractDetails.contract.id && p.status === PaymentStatus.Paid);
+        if (!hasExistingPayments) {
+            setPaymentForOption('Versement initial');
+        } else {
+            setPaymentForOption(selectedContractDetails.contract.type === 'sale' ? 'avance' : 'Loyer mensuel');
+        }
+        setCustomPaymentFor('');
     }
-  }, [selectedContractDetails]);
+  }, [selectedContractDetails, payments]);
+
+  useEffect(() => {
+    if (paymentForOption === 'autre') {
+        setPaymentFor(customPaymentFor);
+    } else {
+        setPaymentFor(paymentForOption);
+    }
+  }, [paymentForOption, customPaymentFor]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -408,7 +424,27 @@ const PaymentsPage: React.FC = () => {
                 </div>
                 <div>
                     <label className="block text-sm font-bold text-gray-700 mb-1">Objet</label>
-                    <input type="text" required value={paymentFor} onChange={e => setPaymentFor(e.target.value)} className={inputClasses} placeholder="Objet du versement" />
+                    <select 
+                        value={paymentForOption} 
+                        onChange={(e) => setPaymentForOption(e.target.value)} 
+                        className={inputClasses}
+                    >
+                        <option value="Versement initial">Versement initial</option>
+                        <option value="avance">Avance</option>
+                        <option value="Solde dossier">Solde dossier</option>
+                        <option value="Loyer mensuel">Loyer mensuel</option>
+                        <option value="autre">Autre (Saisir manuellement)...</option>
+                    </select>
+                    {paymentForOption === 'autre' && (
+                        <input 
+                            type="text" 
+                            value={customPaymentFor} 
+                            onChange={(e) => setCustomPaymentFor(e.target.value)} 
+                            required 
+                            className={`${inputClasses} mt-2 animate-slide-up-from-bottom`} 
+                            placeholder="Préciser l'objet..." 
+                        />
+                    )}
                 </div>
              </div>
 

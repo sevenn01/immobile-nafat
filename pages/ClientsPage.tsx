@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getClients, getContracts, getApartments, addClient, updateClient, deleteClient } from '../services/api';
 import { Client, Contract, Apartment, ContractStatus } from '../types';
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon, AlertTriangleIcon, UsersIcon, GridIcon, ListIcon, XCircleIcon } from '../components/icons/Icons';
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon, AlertTriangleIcon, UsersIcon, GridIcon, ListIcon, XCircleIcon, FileTextIcon } from '../components/icons/Icons';
 import Modal from '../components/Modal';
 import { useAuth } from '../auth/AuthContext';
+import { ClientPdfModal } from '../components/ClientPdfModal';
+import { AllClientsPdfModal } from '../components/AllClientsPdfModal';
 
 const ClientCard: React.FC<{ 
     client: Client; 
@@ -12,7 +14,8 @@ const ClientCard: React.FC<{
     apartments: Apartment[]; 
     onEdit: (client: Client) => void;
     onDelete: (client: Client) => void;
-}> = ({ client, contracts, apartments, onEdit, onDelete }) => {
+    onViewPdf: (client: Client) => void;
+}> = ({ client, contracts, apartments, onEdit, onDelete, onViewPdf }) => {
   const navigate = useNavigate();
   const clientContracts = contracts.filter(c => c.client_id === client.id);
   const activeContracts = clientContracts.filter(c => c.status === ContractStatus.Active || c.status === ContractStatus.SaleInProgress);
@@ -37,6 +40,9 @@ const ClientCard: React.FC<{
             <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-widest">{client.occupation || 'Particulier'}</p>
           </div>
           <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
+              <button onClick={() => onViewPdf(client)} className="p-1.5 rounded-lg text-gray-300 hover:text-green-600 transition-all bg-gray-50/50 hover:bg-green-50" title="Fiche Synthèse Client (PDF)">
+                <FileTextIcon className="w-3.5 h-3.5" />
+              </button>
               <button onClick={() => onEdit(client)} className="p-1.5 rounded-lg text-gray-300 hover:text-blue-600 transition-all bg-gray-50/50 hover:bg-blue-50">
                 <EditIcon className="w-3.5 h-3.5" />
               </button>
@@ -106,6 +112,10 @@ const ClientsPage: React.FC = () => {
         const savedMode = localStorage.getItem('clientsViewMode');
         return (savedMode as 'grid' | 'list') || 'grid';
     });
+    const [pdfClient, setPdfClient] = useState<Client | null>(null);
+    const [isAllClientsPdfOpen, setIsAllClientsPdfOpen] = useState(false);
+    const [isPdfDropdownOpen, setIsPdfDropdownOpen] = useState(false);
+    const [pdfSelectMode, setPdfSelectMode] = useState<'summary' | 'detailed'>('summary');
 
     useEffect(() => {
         localStorage.setItem('clientsViewMode', viewMode);
@@ -204,6 +214,48 @@ const ClientsPage: React.FC = () => {
                         <GridIcon className="w-5 h-5" />
                     </button>
                 </div>
+                <div className="relative">
+                    <button 
+                        onClick={() => setIsPdfDropdownOpen(!isPdfDropdownOpen)} 
+                        className="px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl transition duration-200 flex items-center shadow-sm font-bold active:scale-95"
+                    >
+                        <FileTextIcon className="w-5 h-5 mr-1.5 text-green-600" />
+                        Bilan Global PDF
+                        <svg className="w-4 h-4 ml-1 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ transform: isPdfDropdownOpen ? 'rotate(180deg)' : 'none' }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {isPdfDropdownOpen && (
+                        <>
+                            <div className="fixed inset-0 z-10" onClick={() => setIsPdfDropdownOpen(false)}></div>
+                            <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-20 animate-scale-up">
+                                <button 
+                                    onClick={() => {
+                                        setPdfSelectMode('summary');
+                                        setIsAllClientsPdfOpen(true);
+                                        setIsPdfDropdownOpen(false);
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex flex-col transition"
+                                >
+                                    <span className="text-xs font-bold text-gray-900">1. Bilan Financier Simplifié</span>
+                                    <span className="text-[10px] text-gray-400 mt-0.5">Synthèse rapide de tous les dossiers (Engagé / Payé / Reste)</span>
+                                </button>
+                                <div className="h-px bg-gray-100 my-1"></div>
+                                <button 
+                                    onClick={() => {
+                                        setPdfSelectMode('detailed');
+                                        setIsAllClientsPdfOpen(true);
+                                        setIsPdfDropdownOpen(false);
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-green-50/50 flex flex-col transition"
+                                >
+                                    <span className="text-xs font-bold text-green-700">2. Grand Livre Détaillé</span>
+                                    <span className="text-[10px] text-gray-400 mt-0.5">Situation financière avec historique complet des paiements &amp; dates</span>
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
                 <button onClick={openAddModal} className="px-5 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition duration-200 flex items-center shadow-lg font-bold active:scale-95">
                     <PlusIcon className="w-5 h-5 mr-1" />
                     Ajouter
@@ -236,7 +288,7 @@ const ClientsPage: React.FC = () => {
           viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredClients.map(client => (
-                <ClientCard key={client.id} client={client} contracts={contracts} apartments={apartments} onEdit={openEditModal} onDelete={handleDeleteClient} />
+                <ClientCard key={client.id} client={client} contracts={contracts} apartments={apartments} onEdit={openEditModal} onDelete={handleDeleteClient} onViewPdf={setPdfClient} />
                 ))}
             </div>
           ) : (
@@ -273,6 +325,7 @@ const ClientsPage: React.FC = () => {
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex justify-end space-x-2" onClick={e => e.stopPropagation()}>
+                                        <button onClick={() => setPdfClient(client)} className="p-2 text-gray-400 hover:text-green-600 transition-colors" title="Fiche Synthèse Client (PDF)"><FileTextIcon className="w-5 h-5" /></button>
                                         <button onClick={() => openEditModal(client)} className="p-2 text-gray-400 hover:text-green-600 transition-colors"><EditIcon className="w-5 h-5" /></button>
                                         <button onClick={() => handleDeleteClient(client)} className="p-2 text-gray-400 hover:text-red-600 transition-colors"><TrashIcon className="w-5 h-5" /></button>
                                     </div>
@@ -349,6 +402,14 @@ const ClientsPage: React.FC = () => {
             </div>
         </form>
       </Modal>
+
+      {pdfClient && (
+          <ClientPdfModal client={pdfClient} onClose={() => setPdfClient(null)} />
+      )}
+
+      {isAllClientsPdfOpen && (
+          <AllClientsPdfModal initialMode={pdfSelectMode} onClose={() => setIsAllClientsPdfOpen(false)} />
+      )}
     </div>
   );
 };

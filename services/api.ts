@@ -98,7 +98,30 @@ export const enableDemoMode = (): User => {
     ];
 
     mockDb.apartments = [
-        { id: 'a1', apartment_id: 'a1', project_id: 'p1', name: 'Appart 101', type: 'apartment', floor: '1', surface_m2: 80, rooms: 3, balcony: true, bathroom: 1, kitchen: true, status: ApartmentStatus.Rented, price_dh: 4000, owner_name: 'Nafat', description: '', current_contract_id: 'c1', created_at: now, updated_at: now, intended_for: 'rental' }
+        { 
+            id: 'a1', apartment_id: 'a1', project_id: 'p1', name: 'Appart 201', type: 'apartment', floor: '2', 
+            surface_m2: 95, rooms: 3, balcony: true, bathroom: 2, kitchen: true, status: ApartmentStatus.Sold, 
+            price_dh: 600000, owner_name: 'Ahmed Benali', description: 'Bel appartement ensoleillé', 
+            current_contract_id: 'c1', created_at: now, updated_at: now, intended_for: 'sale' 
+        },
+        { 
+            id: 'a2', apartment_id: 'a2', project_id: 'p1', name: 'Appart 101', type: 'apartment', floor: '1', 
+            surface_m2: 85, rooms: 3, balcony: false, bathroom: 1, kitchen: true, status: ApartmentStatus.ForSale, 
+            price_dh: 550000, owner_name: 'Nafat', description: 'Près de l\'entrée principale', 
+            created_at: now, updated_at: now, intended_for: 'sale' 
+        },
+        { 
+            id: 'a3', apartment_id: 'a3', project_id: 'p1', name: 'Appart 102', type: 'apartment', floor: '1', 
+            surface_m2: 75, rooms: 2, balcony: true, bathroom: 1, kitchen: true, status: ApartmentStatus.ForSale, 
+            price_dh: 480000, owner_name: 'Nafat', description: 'Idéal couple', 
+            created_at: now, updated_at: now, intended_for: 'sale' 
+        },
+        { 
+            id: 'a4', apartment_id: 'a4', project_id: 'p1', name: 'Appart 202', type: 'apartment', floor: '2', 
+            surface_m2: 110, rooms: 4, balcony: true, bathroom: 2, kitchen: true, status: ApartmentStatus.ForSale, 
+            price_dh: 750000, owner_name: 'Nafat', description: 'Grand salon marocain', 
+            created_at: now, updated_at: now, intended_for: 'sale' 
+        }
     ];
 
     mockDb.clients = [
@@ -108,14 +131,25 @@ export const enableDemoMode = (): User => {
     mockDb.contracts = [
         { 
             id: 'c1', contract_id: 'c1', client_id: 'cl1', apartment_id: 'a1', project_id: 'p1',
-            type: 'rental', amount_dh: 4000, duration_months: 12, start_date: new Date(new Date().setMonth(new Date().getMonth() - 2)).toISOString().split('T')[0],
-            end_date: new Date(new Date().setMonth(new Date().getMonth() + 10)).toISOString().split('T')[0],
-            status: ContractStatus.Active, notes: 'Caution reçue', created_at: now, updated_at: now, months_left: 10
+            type: 'sale', amount_dh: 600000, start_date: new Date().toISOString().split('T')[0],
+            status: ContractStatus.SaleInProgress, notes: 'Dossier d\'achat - Versement initial effectué', 
+            created_at: now, updated_at: now
         }
     ];
 
     mockDb.payments = [
-        { id: 'pay1', payment_id: 'pay1', contract_id: 'c1', client_id: 'cl1', amount_dh: 4000, payment_date: new Date(new Date().setMonth(new Date().getMonth() - 2)).toISOString(), payment_for: 'Loyer Janvier 2024', status: PaymentStatus.Paid, payment_method: 'virement', created_at: now, updated_at: now }
+        { 
+            id: 'pay1', payment_id: 'pay1', contract_id: 'c1', client_id: 'cl1', amount_dh: 60000, 
+            payment_date: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(), 
+            payment_for: 'Versement initial', status: PaymentStatus.Paid, payment_method: 'cheque', 
+            cheque_number: 'CH881273', bank_name: 'Attijariwafa Bank', created_at: now, updated_at: now 
+        },
+        { 
+            id: 'pay2', payment_id: 'pay2', contract_id: 'c1', client_id: 'cl1', amount_dh: 30000, 
+            payment_date: new Date(new Date().setHours(new Date().getHours() - 1)).toISOString(), 
+            payment_for: 'avance', status: PaymentStatus.Paid, payment_method: 'especes', 
+            created_at: now, updated_at: now 
+        }
     ];
 
     return demoUser;

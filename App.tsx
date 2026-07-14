@@ -8,6 +8,7 @@ import ProjectsPage from './pages/ProjectsPage';
 import ApartmentsPage from './pages/ApartmentsPage';
 import ClientsPage from './pages/ClientsPage';
 import ContractsPage from './pages/ContractsPage';
+import FinalContractsPage from './pages/FinalContractsPage';
 import LoginPage from './pages/LoginPage';
 import PaymentsPage from './pages/PaymentsPage';
 import PaymentDocumentsPage from './pages/PaymentDocumentsPage';
@@ -82,7 +83,8 @@ const App: React.FC = () => {
             <Route path="/appartements" element={<ApartmentsPage />} />
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/clients/:clientId" element={<ClientDetailsPage />} />
-            <Route path="/contrats" element={<ContractsPage />} />
+            <Route path="/reservations" element={<ContractsPage />} />
+            <Route path="/contrats" element={<FinalContractsPage />} />
             <Route path="/rejets" element={<RejectedSalesPage />} />
             <Route path="/paiements" element={<PaymentsPage />} />
             <Route path="/documents-paiements" element={<PaymentDocumentsPage />} />

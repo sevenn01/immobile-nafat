@@ -25,6 +25,9 @@ const ProjectsPage: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
     const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+    const [hasRdc, setHasRdc] = useState(true);
+    const [numApartments, setNumApartments] = useState(1);
+    const [numRdc, setNumRdc] = useState(1);
 
     useEffect(() => {
         localStorage.setItem('projectsViewMode', viewMode);
@@ -68,14 +71,17 @@ const ProjectsPage: React.FC = () => {
     if (!user) return;
     
     const formData = new FormData(e.currentTarget);
+    const calculatedTotal = numApartments + (hasRdc ? numRdc : 0);
     const projectData: Partial<Project> = {
         project_name: formData.get('projectName') as string,
         location: formData.get('location') as string,
         description: formData.get('description') as string,
         status: (formData.get('status') as ProjectStatus) || ProjectStatus.Active,
         num_floors: Number(formData.get('num_floors')),
-        has_rdc: formData.get('has_rdc') === 'on',
-        total_apartments: Number(formData.get('total_apartments'))
+        has_rdc: hasRdc,
+        num_apartments: numApartments,
+        num_rdc: hasRdc ? numRdc : 0,
+        total_apartments: calculatedTotal
     };
     
     try {
@@ -125,11 +131,18 @@ const ProjectsPage: React.FC = () => {
 
   const openEditModal = (project: Project) => {
     setEditingProject(project);
+    setHasRdc(project.has_rdc !== false);
+    const existingNumRdc = project.num_rdc ?? (project.has_rdc ? 1 : 0);
+    setNumApartments(project.num_apartments ?? Math.max(0, project.total_apartments - existingNumRdc));
+    setNumRdc(existingNumRdc);
     setIsModalOpen(true);
   }
   
   const openAddModal = () => {
     setEditingProject(null);
+    setHasRdc(true);
+    setNumApartments(12);
+    setNumRdc(2);
     setIsModalOpen(true);
   }
 
@@ -278,20 +291,67 @@ const ProjectsPage: React.FC = () => {
               <input type="text" name="location" id="location" defaultValue={editingProject?.location} required className={inputClasses} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="num_floors" className="block text-sm font-medium text-gray-700">Nombre d'étages</label>
                   <input type="number" min="0" name="num_floors" id="num_floors" defaultValue={editingProject?.num_floors || 0} required className={inputClasses} />
                 </div>
-                <div>
-                  <label htmlFor="total_apartments" className="block text-sm font-medium text-gray-700">Capacité (Unités)</label>
-                  <input type="number" min="1" name="total_apartments" id="total_apartments" defaultValue={editingProject?.total_apartments || 1} required className={inputClasses} />
-                </div>
-                <div className="flex items-end pb-2">
+                <div className="flex items-center pt-6">
                     <div className="flex items-center">
-                        <input id="has_rdc" name="has_rdc" type="checkbox" defaultChecked={editingProject?.has_rdc !== false} className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded" />
-                        <label htmlFor="has_rdc" className="ml-2 block text-sm text-gray-900 font-medium">Inclure RDC</label>
+                        <input 
+                            id="has_rdc" 
+                            name="has_rdc" 
+                            type="checkbox" 
+                            checked={hasRdc} 
+                            onChange={(e) => {
+                                setHasRdc(e.target.checked);
+                                if (!e.target.checked) {
+                                    setNumRdc(0);
+                                } else {
+                                    setNumRdc(editingProject?.num_rdc || 1);
+                                }
+                            }}
+                            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded cursor-pointer" 
+                        />
+                        <label htmlFor="has_rdc" className="ml-2 block text-sm text-gray-900 font-medium cursor-pointer">Inclure RDC</label>
                     </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="num_apartments" className="block text-sm font-medium text-gray-700">Nombre d'appartements</label>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    name="num_apartments" 
+                    id="num_apartments" 
+                    value={numApartments}
+                    onChange={(e) => setNumApartments(Number(e.target.value))}
+                    required 
+                    className={inputClasses} 
+                  />
+                </div>
+                <div>
+                  <label htmlFor="num_rdc" className={`block text-sm font-medium transition-colors ${hasRdc ? 'text-gray-700' : 'text-gray-400'}`}>Nombre de RDC</label>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    name="num_rdc" 
+                    id="num_rdc" 
+                    value={hasRdc ? numRdc : 0}
+                    onChange={(e) => setNumRdc(Number(e.target.value))}
+                    disabled={!hasRdc}
+                    required 
+                    className={`${inputClasses} ${!hasRdc ? 'bg-gray-100/80 text-gray-400 cursor-not-allowed' : ''}`} 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Capacité Totale (Unités)</label>
+                  <div className="mt-1 block w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-green-700">
+                    {numApartments + (hasRdc ? numRdc : 0)} unités
+                  </div>
+                  <input type="hidden" name="total_apartments" value={numApartments + (hasRdc ? numRdc : 0)} />
                 </div>
             </div>
 

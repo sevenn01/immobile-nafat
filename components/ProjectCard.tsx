@@ -70,10 +70,14 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit, onDelete }) 
             {project.location}
         </p>
 
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between">
             <span className={`px-4 py-1.5 text-[10px] font-semibold rounded-full uppercase tracking-widest ${getRentalStatusClasses(rentalStatus)}`}>
               {rentalStatus}
             </span>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 flex gap-2">
+              <span>{project.num_apartments ?? project.total_apartments} Apt(s)</span>
+              {project.has_rdc && <span>• {project.num_rdc ?? 0} RDC</span>}
+            </div>
         </div>
 
         <div className="mt-auto pt-6 border-t border-gray-50">
