@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getClients, getPayments, getContracts, getApartments, addPayment, updatePayment } from '../services/api';
-import { Client, Payment, PaymentStatus, Contract, ContractStatus, Apartment, PaymentMethod } from '../types';
+import { getClients, getPayments, getContracts, getApartments, getProjects, addPayment, updatePayment } from '../services/api';
+import { Client, Payment, PaymentStatus, Contract, ContractStatus, Apartment, PaymentMethod, Project } from '../types';
 import Modal from '../components/Modal';
 import { useAuth } from '../auth/AuthContext';
 import { CoinsIcon, PrinterIcon, FileTextIcon, XCircleIcon, PaperclipIcon, ClockIcon, TrashIcon } from '../components/icons/Icons';
@@ -60,6 +60,7 @@ const ClientDetailsPage: React.FC = () => {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [apartments, setApartments] = useState<Apartment[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
@@ -76,8 +77,8 @@ const ClientDetailsPage: React.FC = () => {
         if (!clientId) return;
         try {
             setLoading(true);
-            const [clientsData, paymentsData, contractsData, apartmentsData] = await Promise.all([
-                getClients(), getPayments(), getContracts(), getApartments()
+            const [clientsData, paymentsData, contractsData, apartmentsData, projectsData] = await Promise.all([
+                getClients(), getPayments(), getContracts(), getApartments(), getProjects()
             ]);
             const currentClient = clientsData.find(c => c.id === clientId) || null;
             
@@ -122,6 +123,7 @@ const ClientDetailsPage: React.FC = () => {
             setPayments(clientPayments);
             setContracts(clientContracts);
             setApartments(apartmentsData);
+            setProjects(projectsData);
         } catch (error) { console.error(error); } finally { setLoading(false); }
     }, [clientId]);
 
@@ -137,14 +139,21 @@ const ClientDetailsPage: React.FC = () => {
     const { activeContracts, archivedContracts } = useMemo(() => {
         const withDetails = contracts.map(contract => {
             const apartment = apartments.find(a => a.id === contract.apartment_id);
+            const project = projects.find(p => p.id === contract.project_id);
             const totalPaid = payments.filter(p => p.contract_id === contract.id && p.status === PaymentStatus.Paid).reduce((sum, p) => sum + p.amount_dh, 0);
-            return { ...contract, apartmentName: apartment?.name || 'Unité Inconnue', totalPaid, remainingAmount: Math.max(0, contract.amount_dh - totalPaid) };
+            return { 
+                ...contract, 
+                apartmentName: apartment?.name || 'Unité Inconnue', 
+                projectName: project?.project_name || 'Projet Inconnu',
+                totalPaid, 
+                remainingAmount: Math.max(0, contract.amount_dh - totalPaid) 
+            };
         });
         return {
             activeContracts: withDetails.filter(c => c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled && c.status !== ContractStatus.Ended),
             archivedContracts: withDetails.filter(c => c.status === ContractStatus.Canceled || c.status === ContractStatus.SaleCanceled || c.status === ContractStatus.Ended)
         };
-    }, [contracts, apartments, payments]);
+    }, [contracts, apartments, payments, projects]);
 
     const handleOpenPaymentModal = (contract: Contract) => {
         setSelectedContract(contract);
@@ -275,8 +284,13 @@ const ClientDetailsPage: React.FC = () => {
                                         {activeContracts.length > 0 ? activeContracts.map(c => (
                                             <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
                                                 <td className="px-4 md:px-6 py-4 md:py-5 text-slate-900">
-                                                    {c.apartmentName}
-                                                    <div className="sm:hidden text-[10px] text-slate-400">Total: {c.amount_dh.toLocaleString()} DH</div>
+                                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                                        <span className="font-bold">{c.apartmentName}</span>
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 w-fit">
+                                                            {c.projectName}
+                                                        </span>
+                                                    </div>
+                                                    <div className="sm:hidden text-[10px] text-slate-400 mt-1">Total: {c.amount_dh.toLocaleString()} DH</div>
                                                 </td>
                                                 <td className="hidden sm:table-cell px-4 md:px-6 py-4 md:py-5 text-slate-900">{c.amount_dh.toLocaleString()} DH</td>
                                                 <td className="px-4 md:px-6 py-4 md:py-5">
@@ -378,7 +392,8 @@ const ClientDetailsPage: React.FC = () => {
                                     <div key={c.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center group hover:bg-slate-100 transition-colors">
                                         <div>
                                             <p className="text-sm font-bold text-slate-800">{c.apartmentName}</p>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-1">Dossier archivé</p>
+                                            <p className="text-[10px] text-indigo-600 font-bold mt-1">{c.projectName}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">Dossier archivé</p>
                                         </div>
                                         <span className={getContractStatusBadge(c.status)}>{c.status}</span>
                                     </div>

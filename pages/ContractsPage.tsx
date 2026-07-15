@@ -64,6 +64,7 @@ const ContractsPage: React.FC = () => {
     const [clients, setClients] = useState<Client[]>([]);
     const [apartments, setApartments] = useState<Apartment[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
@@ -73,6 +74,11 @@ const ContractsPage: React.FC = () => {
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const [contractToCancel, setContractToCancel] = useState<Contract | null>(null);
     const [cancelReason, setCancelReason] = useState('');
+    
+    // Refund details for cancellation/désistement
+    const [refundStatus, setRefundStatus] = useState<'none' | 'total' | 'partial'>('none');
+    const [refundAmount, setRefundAmount] = useState<number>(0);
+    const [refundNotes, setRefundNotes] = useState('');
 
     const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -108,8 +114,18 @@ const ContractsPage: React.FC = () => {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const [ctrs, cls, apts, projs] = await Promise.all([ getContracts(), getClients(), getApartments(), getProjects() ]);
-            setContracts(ctrs); setClients(cls); setApartments(apts); setProjects(projs);
+            const [ctrs, cls, apts, projs, pays] = await Promise.all([ 
+                getContracts(), 
+                getClients(), 
+                getApartments(), 
+                getProjects(),
+                getPayments()
+            ]);
+            setContracts(ctrs); 
+            setClients(cls); 
+            setApartments(apts); 
+            setProjects(projs);
+            setPayments(pays);
             if (projs.length > 0 && !selectedProjectId) setSelectedProjectId(projs[0].id);
         } catch (error) { console.error(error); } finally { setLoading(false); }
     }, [selectedProjectId]);
@@ -211,11 +227,21 @@ const ContractsPage: React.FC = () => {
     const handleCancelSubmit = async () => {
         if (!user || !contractToCancel) return;
         try {
-            await cancelContract(contractToCancel, user.user_id, cancelReason);
+            await cancelContract(
+                contractToCancel, 
+                user.user_id, 
+                cancelReason,
+                refundStatus,
+                refundAmount,
+                refundNotes
+            );
             setNotification({ message: "Le dossier a été annulé et archivé.", type: 'success' });
             setIsCancelModalOpen(false);
             setContractToCancel(null);
             setCancelReason('');
+            setRefundStatus('none');
+            setRefundAmount(0);
+            setRefundNotes('');
             fetchData();
         } catch (error) {
             setNotification({ message: "Erreur lors de l'annulation.", type: 'error' });
@@ -240,6 +266,22 @@ const ContractsPage: React.FC = () => {
             console.error(error);
             setNotification({ message: "Erreur lors de la récupération des paiements.", type: 'error' });
         }
+    };
+
+    const contractToDeleteTotalPaid = useMemo(() => {
+        if (!contractToDelete) return 0;
+        return payments
+            .filter(p => p.contract_id === contractToDelete.id && p.status === PaymentStatus.Paid)
+            .reduce((sum, p) => sum + p.amount_dh, 0);
+    }, [contractToDelete, payments]);
+
+    const closeDeleteModal = () => {
+        setIsDeleteModalOpen(false);
+        setContractToDelete(null);
+        setCancelReason('');
+        setRefundStatus('none');
+        setRefundAmount(0);
+        setRefundNotes('');
     };
 
     if (loading) return <div className="p-8 text-center text-gray-500 italic font-bold">Chargement des dossiers...</div>;
@@ -514,7 +556,217 @@ const ContractsPage: React.FC = () => {
 
         {reservationContractId && <ReservationFormPage contractId={reservationContractId} onClose={() => setReservationContractId(null)} />}
         {receiptPaymentId && <ReceiptPage paymentId={receiptPaymentId} onClose={() => setReceiptPaymentId(null)} />}
-        <ConfirmationModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={async () => { if(contractToDelete) { await deleteContract(contractToDelete.id); await fetchData(); setIsDeleteModalOpen(false); setNotification({ message: "Dossier supprimé.", type: 'success' }); } }} title="Supprimer le dossier ?" message="Attention : cette action supprimera également tous les paiements associés." />
+        <Modal 
+            isOpen={isDeleteModalOpen} 
+            onClose={closeDeleteModal} 
+            title="Suppression ou Désistement du dossier"
+        >
+            <div className="space-y-6">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p className="text-sm text-amber-800 font-bold leading-relaxed">
+                        Que souhaitez-vous faire avec ce dossier ? Nous vous conseillons de le classer comme <span className="underline font-extrabold text-amber-900">Désistement</span> pour garder un historique complet, libérer la propriété, et conserver une trace des raisons ainsi que des remboursements.
+                    </p>
+                </div>
+
+                {contractToDelete && (
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-gray-600 space-y-1.5 shadow-inner">
+                        <div className="font-bold text-gray-800 text-sm mb-1.5 flex items-center justify-between">
+                            <span>Dossier sélectionné :</span>
+                            <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full font-extrabold uppercase text-[9px]">{contractToDelete.type === 'rental' ? 'Location' : 'Vente'}</span>
+                        </div>
+                        <div><span className="font-bold text-gray-500 uppercase tracking-wider text-[10px]">Client:</span> <span className="font-extrabold text-gray-800 text-xs">{clients.find(cl => cl.id === contractToDelete.client_id)?.full_name}</span></div>
+                        <div><span className="font-bold text-gray-500 uppercase tracking-wider text-[10px]">Propriété:</span> <span className="font-extrabold text-gray-800 text-xs">{apartments.find(a => a.id === contractToDelete.apartment_id)?.name} ({projects.find(p => p.id === contractToDelete.project_id)?.project_name})</span></div>
+                        <div><span className="font-bold text-gray-500 uppercase tracking-wider text-[10px]">Montant Dossier:</span> <span className="font-extrabold text-gray-800 text-xs">{contractToDelete.amount_dh.toLocaleString()} DH</span></div>
+                        <div className="pt-1.5 border-t border-slate-200 flex items-center justify-between text-xs">
+                            <span className="font-bold text-indigo-600 uppercase tracking-wider text-[10px]">Total encaissé à ce jour:</span>
+                            <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded font-extrabold text-xs">{contractToDeleteTotalPaid.toLocaleString()} DH</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* OPTION 1: DESISTEMENT / CANCELLATION */}
+                <div className="border border-indigo-100 rounded-2xl p-5 bg-indigo-50/20 space-y-4">
+                    <div className="flex items-start space-x-3">
+                        <div className="p-2 bg-indigo-100 text-indigo-700 rounded-lg font-bold text-sm shrink-0">1</div>
+                        <div>
+                            <h4 className="text-sm font-bold text-gray-800">Option recommandée : Classer en Désistement</h4>
+                            <p className="text-xs text-gray-500 mt-0.5">Le dossier sera marqué comme annulé et apparaîtra dans l'archive "Désistements" avec le motif saisi et les détails de remboursement des avances.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">Motif du désistement / Remarque <span className="text-red-500">*</span></label>
+                        <textarea
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            placeholder="Saisissez le motif ou une remarque (ex: Problème de financement, changement d'avis...)"
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
+                            rows={2}
+                        />
+                    </div>
+
+                    {/* REFUND OPTIONS */}
+                    <div className="bg-white border border-gray-100 rounded-xl p-3 space-y-3 shadow-sm">
+                        <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Traitement des avances encaissées</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setRefundStatus('none');
+                                    setRefundAmount(0);
+                                }}
+                                className={`px-2 py-2 rounded-xl font-bold text-center text-[10px] sm:text-xs border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                                    refundStatus === 'none'
+                                        ? 'bg-red-50 border-red-200 text-red-700 ring-2 ring-red-500/20'
+                                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <span className="font-extrabold uppercase">Aucun</span>
+                                <span className="text-[9px] opacity-75">Conserver</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setRefundStatus('total');
+                                    setRefundAmount(contractToDeleteTotalPaid);
+                                }}
+                                className={`px-2 py-2 rounded-xl font-bold text-center text-[10px] sm:text-xs border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                                    refundStatus === 'total'
+                                        ? 'bg-green-50 border-green-200 text-green-700 ring-2 ring-green-500/20'
+                                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <span className="font-extrabold uppercase">Total (100%)</span>
+                                <span className="text-[9px] opacity-75">{contractToDeleteTotalPaid.toLocaleString()} DH</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setRefundStatus('partial');
+                                    setRefundAmount(0);
+                                }}
+                                className={`px-2 py-2 rounded-xl font-bold text-center text-[10px] sm:text-xs border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                                    refundStatus === 'partial'
+                                        ? 'bg-yellow-50 border-yellow-200 text-yellow-700 ring-2 ring-yellow-500/20'
+                                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <span className="font-extrabold uppercase">Partiel</span>
+                                <span className="text-[9px] opacity-75">Montant libre</span>
+                            </button>
+                        </div>
+
+                        {refundStatus !== 'none' && (
+                            <div className="pt-2 space-y-2 border-t border-gray-100">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Montant remboursé (DH)</label>
+                                        <input
+                                            type="number"
+                                            disabled={refundStatus === 'total'}
+                                            value={refundAmount || ''}
+                                            onChange={(e) => {
+                                                const val = Number(e.target.value);
+                                                if (val > contractToDeleteTotalPaid) {
+                                                    setRefundAmount(contractToDeleteTotalPaid);
+                                                } else {
+                                                    setRefundAmount(val);
+                                                }
+                                            }}
+                                            max={contractToDeleteTotalPaid}
+                                            min={0}
+                                            placeholder="Montant en DH"
+                                            className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-500"
+                                        />
+                                        {refundStatus === 'partial' && (
+                                            <span className="text-[8px] text-gray-400 font-semibold block mt-0.5">Maximum possible: {contractToDeleteTotalPaid.toLocaleString()} DH</span>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Note de remboursement</label>
+                                        <input
+                                            type="text"
+                                            value={refundNotes}
+                                            onChange={(e) => setRefundNotes(e.target.value)}
+                                            placeholder="Ex: Chèque n° 987654"
+                                            className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            onClick={async () => {
+                                if (!contractToDelete || !user) return;
+                                try {
+                                    await cancelContract(
+                                        contractToDelete, 
+                                        user.user_id, 
+                                        cancelReason || 'Non spécifié',
+                                        refundStatus,
+                                        refundAmount,
+                                        refundNotes
+                                    );
+                                    await fetchData();
+                                    closeDeleteModal();
+                                    setNotification({ message: "Le dossier a été archivé dans les Désistements.", type: 'success' });
+                                } catch (error) {
+                                    console.error(error);
+                                    setNotification({ message: "Erreur lors de l'archivage.", type: 'error' });
+                                }
+                            }}
+                            disabled={!cancelReason.trim()}
+                            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center space-x-1.5"
+                        >
+                            <span>Confirmer le Désistement</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* OPTION 2: PERMANENT DELETION */}
+                <div className="border border-red-100 rounded-2xl p-5 bg-red-50/20 space-y-4">
+                    <div className="flex items-start space-x-3">
+                        <div className="p-2 bg-red-100 text-red-700 rounded-lg font-bold text-sm shrink-0">2</div>
+                        <div>
+                            <h4 className="text-sm font-bold text-gray-800">Option destructive : Suppression définitive</h4>
+                            <p className="text-xs text-gray-500 mt-0.5">Supprime définitivement le dossier et tous ses paiements associés de la base de données. Aucun historique ne sera conservé.</p>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            onClick={async () => {
+                                if (!contractToDelete) return;
+                                try {
+                                    await deleteContract(contractToDelete.id);
+                                    await fetchData();
+                                    closeDeleteModal();
+                                    setNotification({ message: "Dossier supprimé définitivement de la base de données.", type: 'success' });
+                                } catch (error) {
+                                    console.error(error);
+                                    setNotification({ message: "Erreur lors de la suppression.", type: 'error' });
+                                }
+                            }}
+                            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer"
+                        >
+                            Supprimer définitivement
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex justify-end pt-3 border-t">
+                    <button
+                        onClick={closeDeleteModal}
+                        className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs transition-all"
+                    >
+                        Fermer / Annuler
+                    </button>
+                </div>
+            </div>
+        </Modal>
     </div>
   );
 };

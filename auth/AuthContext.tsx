@@ -79,7 +79,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    console.warn('useAuth must be used within an AuthProvider. Using safe fallback.');
+    return {
+      user: null,
+      login: async () => {},
+      loginDemo: () => {},
+      logout: () => {},
+      loading: false,
+      error: null
+    };
   }
   return context;
 };

@@ -80,6 +80,7 @@ const RejectedSalesPage: React.FC = () => {
                                 <th className="px-4 md:px-6 py-4 text-left">Client</th>
                                 <th className="px-4 md:px-6 py-4 text-left">Unité</th>
                                 <th className="hidden sm:table-cell px-4 md:px-6 py-4 text-left">Valeur</th>
+                                <th className="px-4 md:px-6 py-4 text-left">Remboursement</th>
                                 <th className="px-4 md:px-6 py-4 text-left">Motif</th>
                             </tr>
                         </thead>
@@ -100,6 +101,26 @@ const RejectedSalesPage: React.FC = () => {
                                             <div className="sm:hidden text-xs text-red-600 font-bold mt-1">{c.amount_dh.toLocaleString()} DH</div>
                                         </td>
                                         <td className="hidden sm:table-cell px-4 md:px-6 py-4 font-bold text-black text-sm">{c.amount_dh.toLocaleString()} DH</td>
+                                        <td className="px-4 md:px-6 py-4">
+                                            {c.refund_status === 'total' ? (
+                                                <div className="space-y-0.5">
+                                                    <span className="px-2 py-0.5 bg-green-100 text-green-800 text-[9px] font-extrabold rounded-full uppercase tracking-wider">Total</span>
+                                                    <div className="font-extrabold text-xs text-green-700">{c.refund_amount?.toLocaleString() || 0} DH</div>
+                                                    {c.refund_notes && <div className="text-[9px] text-gray-400 italic max-w-[120px] truncate" title={c.refund_notes}>{c.refund_notes}</div>}
+                                                </div>
+                                            ) : c.refund_status === 'partial' ? (
+                                                <div className="space-y-0.5">
+                                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-extrabold rounded-full uppercase tracking-wider">Partiel</span>
+                                                    <div className="font-extrabold text-xs text-amber-700">{c.refund_amount?.toLocaleString() || 0} DH</div>
+                                                    {c.refund_notes && <div className="text-[9px] text-gray-400 italic max-w-[120px] truncate" title={c.refund_notes}>{c.refund_notes}</div>}
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-0.5">
+                                                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[9px] font-extrabold rounded-full uppercase tracking-wider">Aucun</span>
+                                                    <div className="text-[9px] text-gray-400">0 DH (Conservé)</div>
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="px-4 md:px-6 py-4">
                                             <div className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-[10px] md:text-xs italic text-slate-500 max-w-[150px] md:max-w-sm truncate sm:whitespace-normal">
                                                 {c.rejection_reason || 'N/A'}

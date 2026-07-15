@@ -60,6 +60,26 @@ const Sidebar: React.FC = () => {
                 <span className="ml-3 font-medium">Clients</span>
               </NavLink>
           )}
+          {canView('payments') && (
+              <>
+                  <NavLink
+                    to="/paiements"
+                    className={({ isActive }) => `${commonLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass} mt-2`}
+                  >
+                    <PaymentIcon className="w-5 h-5" />
+                    <span className="ml-3 font-medium">Paiements</span>
+                  </NavLink>
+                  {/* Documents section hidden for now
+                  <NavLink
+                    to="/documents-paiements"
+                    className={({ isActive }) => `${commonLinkClass} ${isActive ? 'bg-green-50 text-green-700' : 'hover:bg-green-50 text-gray-600'} mt-1`}
+                  >
+                    <PaperclipIcon className="w-5 h-5" />
+                    <span className="ml-3 font-medium">Documents</span>
+                  </NavLink>
+                  */}
+              </>
+          )}
           {canView('contracts') && (
               <>
                 <NavLink
@@ -80,24 +100,6 @@ const Sidebar: React.FC = () => {
           )}
           
 
-          {canView('payments') && (
-              <>
-                  <NavLink
-                    to="/paiements"
-                    className={({ isActive }) => `${commonLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass} mt-2`}
-                  >
-                    <PaymentIcon className="w-5 h-5" />
-                    <span className="ml-3 font-medium">Paiements</span>
-                  </NavLink>
-                  <NavLink
-                    to="/documents-paiements"
-                    className={({ isActive }) => `${commonLinkClass} ${isActive ? 'bg-green-50 text-green-700' : 'hover:bg-green-50 text-gray-600'} mt-1`}
-                  >
-                    <PaperclipIcon className="w-5 h-5" />
-                    <span className="ml-3 font-medium">Documents</span>
-                  </NavLink>
-              </>
-          )}
           
           <NavLink
             to="/rejets"

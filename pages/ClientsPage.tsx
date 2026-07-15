@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getClients, getContracts, getApartments, addClient, updateClient, deleteClient } from '../services/api';
-import { Client, Contract, Apartment, ContractStatus } from '../types';
+import { getClients, getContracts, getApartments, getProjects, addClient, updateClient, deleteClient } from '../services/api';
+import { Client, Contract, Apartment, Project, ContractStatus } from '../types';
 import { PlusIcon, EditIcon, TrashIcon, SearchIcon, AlertTriangleIcon, UsersIcon, GridIcon, ListIcon, XCircleIcon, FileTextIcon } from '../components/icons/Icons';
 import Modal from '../components/Modal';
 import { useAuth } from '../auth/AuthContext';
@@ -12,10 +12,11 @@ const ClientCard: React.FC<{
     client: Client; 
     contracts: Contract[]; 
     apartments: Apartment[]; 
+    projects: Project[];
     onEdit: (client: Client) => void;
     onDelete: (client: Client) => void;
     onViewPdf: (client: Client) => void;
-}> = ({ client, contracts, apartments, onEdit, onDelete, onViewPdf }) => {
+}> = ({ client, contracts, apartments, projects, onEdit, onDelete, onViewPdf }) => {
   const navigate = useNavigate();
   const clientContracts = contracts.filter(c => c.client_id === client.id);
   const activeContracts = clientContracts.filter(c => c.status === ContractStatus.Active || c.status === ContractStatus.SaleInProgress);
@@ -75,11 +76,19 @@ const ClientCard: React.FC<{
             <div className="space-y-1.5">
               {activeContracts.slice(0, 2).map(contract => {
                 const apartment = apartments.find(a => a.id === contract.apartment_id);
+                const project = projects.find(p => p.id === contract.project_id);
                 return (
                   <div key={contract.id} className="flex items-center justify-between p-2 bg-gray-50/50 rounded-xl group-hover:bg-white transition-colors border border-transparent group-hover:border-gray-100">
-                    <div className="flex items-center">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2 shadow-lg shadow-green-200"></div>
-                        <span className="text-xs font-semibold text-gray-600 truncate max-w-[120px]">{apartment?.name || 'Unité'}</span>
+                    <div className="flex flex-col">
+                        <div className="flex items-center">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2 shadow-lg shadow-green-200"></div>
+                            <span className="text-xs font-semibold text-gray-600 truncate max-w-[120px]">{apartment?.name || 'Unité'}</span>
+                        </div>
+                        {project && (
+                            <span className="text-[9px] text-indigo-600 font-bold ml-3.5">
+                                {project.project_name}
+                            </span>
+                        )}
                     </div>
                     <span className="text-[8px] font-semibold text-gray-400 uppercase tracking-widest">{contract.type === 'sale' ? 'Vente' : 'Loc'}</span>
                   </div>
@@ -102,6 +111,7 @@ const ClientsPage: React.FC = () => {
     const [clients, setClients] = useState<Client[]>([]);
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [apartments, setApartments] = useState<Apartment[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -124,10 +134,16 @@ const ClientsPage: React.FC = () => {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const [clientsData, contractsData, apartmentsData] = await Promise.all([ getClients(), getContracts(), getApartments() ]);
+            const [clientsData, contractsData, apartmentsData, projectsData] = await Promise.all([ 
+                getClients(), 
+                getContracts(), 
+                getApartments(),
+                getProjects()
+            ]);
             setClients(clientsData);
             setContracts(contractsData);
             setApartments(apartmentsData);
+            setProjects(projectsData);
         } catch (error) { console.error("Failed to fetch data:", error);
         } finally { setLoading(false); }
     }, []);
@@ -288,7 +304,7 @@ const ClientsPage: React.FC = () => {
           viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredClients.map(client => (
-                <ClientCard key={client.id} client={client} contracts={contracts} apartments={apartments} onEdit={openEditModal} onDelete={handleDeleteClient} onViewPdf={setPdfClient} />
+                <ClientCard key={client.id} client={client} contracts={contracts} apartments={apartments} projects={projects} onEdit={openEditModal} onDelete={handleDeleteClient} onViewPdf={setPdfClient} />
                 ))}
             </div>
           ) : (
@@ -319,9 +335,28 @@ const ClientsPage: React.FC = () => {
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-700 font-medium">{client.phone}</td>
                                 <td className="px-6 py-4">
-                                    <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
-                                        {contracts.filter(c => c.client_id === client.id).length} dossier(s)
-                                    </span>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg w-fit">
+                                            {contracts.filter(c => c.client_id === client.id).length} dossier(s)
+                                        </span>
+                                        {(() => {
+                                            const clientContracts = contracts.filter(c => c.client_id === client.id);
+                                            const assignedProjects = Array.from(new Set(
+                                                clientContracts.map(c => {
+                                                    const proj = projects.find(p => p.id === c.project_id);
+                                                    return proj ? proj.project_name : null;
+                                                }).filter(Boolean)
+                                            ));
+                                            if (assignedProjects.length > 0) {
+                                                return (
+                                                    <span className="text-[10px] text-indigo-600 font-bold">
+                                                        {assignedProjects.join(', ')}
+                                                    </span>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex justify-end space-x-2" onClick={e => e.stopPropagation()}>

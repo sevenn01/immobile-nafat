@@ -70,6 +70,20 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
                             <span className="mx-4 font-medium">Clients</span>
                         </NavLink>
                     )}
+                    {canView('payments') && (
+                        <>
+                            <NavLink to="/paiements" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass} mt-2`}>
+                                <PaymentIcon className="w-5 h-5" />
+                                <span className="mx-4 font-medium">Paiements</span>
+                            </NavLink>
+                            {/* Documents section hidden for now
+                            <NavLink to="/documents-paiements" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? 'bg-green-50 text-green-700' : 'hover:bg-green-50 text-gray-700'} mt-1`}>
+                                <PaperclipIcon className="w-5 h-5" />
+                                <span className="mx-4 font-medium">Documents</span>
+                            </NavLink>
+                            */}
+                        </>
+                    )}
                     {canView('contracts') && (
                         <>
                             <NavLink to="/reservations" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass} mt-2`}>
@@ -79,18 +93,6 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
                             <NavLink to="/contrats" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass} mt-2`}>
                                 <FileTextIcon className="w-5 h-5 text-indigo-600" />
                                 <span className="mx-4 font-medium">Contrats (Définitifs)</span>
-                            </NavLink>
-                        </>
-                    )}
-                    {canView('payments') && (
-                        <>
-                            <NavLink to="/paiements" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass} mt-2`}>
-                                <PaymentIcon className="w-5 h-5" />
-                                <span className="mx-4 font-medium">Paiements</span>
-                            </NavLink>
-                            <NavLink to="/documents-paiements" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? 'bg-green-50 text-green-700' : 'hover:bg-green-50 text-gray-700'} mt-1`}>
-                                <PaperclipIcon className="w-5 h-5" />
-                                <span className="mx-4 font-medium">Documents</span>
                             </NavLink>
                         </>
                     )}

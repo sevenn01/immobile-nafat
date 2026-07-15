@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getContracts, getClients, getApartments, getProjects, getPayments, updateContract } from '../services/api';
 import { Contract, Client, Apartment, ContractStatus, Project, Payment, PaymentStatus } from '../types';
-import { Search, FileText, Printer, Eye, User, CheckCircle2, ChevronRight, AlertCircle, Sparkles, Pencil, Check, X, MessageSquare } from 'lucide-react';
+import { Search, FileText, Printer, Eye, User, CheckCircle2, ChevronRight, AlertCircle, Sparkles, Pencil, Check, X, MessageSquare, Download } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import Modal from '../components/Modal';
 
@@ -30,7 +30,7 @@ const FinalContractsPage: React.FC = () => {
         if (!user) return;
         try {
             setUpdatingId(contractId);
-            await updateContract(contractId, { notes: editingNotesText }, user.uid);
+            await updateContract(contractId, { notes: editingNotesText }, user.id);
             // Update local state
             setContracts(prev => prev.map(c => c.id === contractId ? { ...c, notes: editingNotesText } : c));
             setEditingContractId(null);
@@ -109,6 +109,82 @@ const FinalContractsPage: React.FC = () => {
                    cin.toLowerCase().includes(searchLower);
         });
     }, [completedContracts, searchTerm]);
+
+    const projectsWithCompletedContracts = useMemo(() => {
+        const projIds = Array.from(new Set(completedContracts.map(c => c.project_id).filter(Boolean)));
+        return projIds.map(id => projects.find(p => p.id === id)).filter(Boolean) as Project[];
+    }, [completedContracts, projects]);
+
+    const handleExportProject = (projectId: string, projectName: string) => {
+        const projectContracts = completedContracts.filter(c => c.project_id === projectId);
+        if (projectContracts.length === 0) return;
+
+        // Header row with UTF-8 BOM
+        const headers = [
+            "Client",
+            "CIN",
+            "Téléphone",
+            "Email",
+            "Projet",
+            "Bien / Appartement",
+            "Titre de l'appartement",
+            "Prix d'achat (DH)",
+            "Montant réglé (DH)",
+            "Date de contrat",
+            "Remarques / Observations"
+        ];
+
+        // Map contracts to CSV rows
+        const rows = projectContracts.map(item => {
+            const clientName = item.client?.full_name || '';
+            const cin = item.client?.cin_number || '';
+            const phone = item.client?.phone || '';
+            const email = item.client?.email || '';
+            const projName = item.project?.project_name || '';
+            const aptName = item.apartment?.name || '';
+            const aptTitle = item.apartment?.titre || 'Non renseigné';
+            const price = item.amount_dh || 0;
+            const totalPaid = item.totalPaid || 0;
+            const date = item.start_date || '';
+            const notes = item.notes || '';
+
+            // Escape double quotes and wrap in double quotes
+            const escapeCSV = (val: any) => {
+                const str = String(val).replace(/"/g, '""');
+                return `"${str}"`;
+            };
+
+            return [
+                escapeCSV(clientName),
+                escapeCSV(cin),
+                escapeCSV(phone),
+                escapeCSV(email),
+                escapeCSV(projName),
+                escapeCSV(aptName),
+                escapeCSV(aptTitle),
+                price,
+                totalPaid,
+                escapeCSV(date),
+                escapeCSV(notes)
+            ].join(';');
+        });
+
+        const csvContent = "\uFEFF" + [headers.join(';'), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Ventes_Soldees_${projectName.replace(/\s+/g, '_')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleExportAll = () => {
+        projectsWithCompletedContracts.forEach(proj => {
+            handleExportProject(proj.id, proj.project_name);
+        });
+    };
 
     const handleOpenContractModal = (contract: Contract) => {
         setSelectedContract(contract);
@@ -210,6 +286,45 @@ const FinalContractsPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Export Section separated by project */}
+            {projectsWithCompletedContracts.length > 0 && (
+                <div className="bg-gradient-to-r from-indigo-50 to-indigo-100/40 border border-indigo-150 p-5 rounded-2xl shadow-sm space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="flex items-center space-x-2">
+                            <FileText className="w-5 h-5 text-indigo-600" />
+                            <h3 className="text-sm font-bold text-gray-800">Extraire les rapports clients soldés par Projet</h3>
+                        </div>
+                        <button
+                            onClick={handleExportAll}
+                            className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow transition-all space-x-1.5 cursor-pointer"
+                        >
+                            <Download className="w-4 h-4" />
+                            <span>Exporter Tous (Fichiers séparés par Projet)</span>
+                        </button>
+                    </div>
+                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                        Téléchargez les listes des clients ayant entièrement soldé leurs paiements. Les fichiers d'extraction sont générés séparément par projet au format CSV (encodage UTF-8 avec BOM, séparateur point-virgule) pour une compatibilité parfaite avec Excel.
+                    </p>
+                    <div className="flex flex-wrap gap-2.5 pt-1">
+                        {projectsWithCompletedContracts.map(proj => {
+                            const count = completedContracts.filter(c => c.project_id === proj.id).length;
+                            return (
+                                <button
+                                    key={proj.id}
+                                    onClick={() => handleExportProject(proj.id, proj.project_name)}
+                                    className="inline-flex items-center px-3.5 py-2 bg-white hover:bg-indigo-50/50 border border-gray-200 hover:border-indigo-200 text-xs font-semibold text-gray-700 rounded-xl transition-all shadow-sm hover:shadow space-x-2 cursor-pointer group"
+                                >
+                                    <span className="w-2 h-2 rounded-full bg-green-500 group-hover:scale-110 transition-transform"></span>
+                                    <span className="font-bold">{proj.project_name}</span>
+                                    <span className="bg-indigo-50 text-indigo-700 text-[10px] px-1.5 py-0.5 rounded font-bold">{count} soldé(s)</span>
+                                    <Download className="w-3.5 h-3.5 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* List Table */}
             {filteredCompletedContracts.length > 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -222,6 +337,7 @@ const FinalContractsPage: React.FC = () => {
                                     <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Titre de l'appartement</th>
                                     <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Prix & Réglé</th>
                                     <th scope="col" className="px-6 py-3.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Statut Paiement</th>
+                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Remarques / Observations</th>
                                     <th scope="col" className="px-6 py-3.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -267,6 +383,55 @@ const FinalContractsPage: React.FC = () => {
                                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 uppercase tracking-wider">
                                                 <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> PAYÉ & VALIDÉ
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {editingContractId === item.id ? (
+                                                <div className="flex items-center space-x-2">
+                                                    <input
+                                                        type="text"
+                                                        value={editingNotesText}
+                                                        onChange={(e) => setEditingNotesText(e.target.value)}
+                                                        className="block w-full min-w-[150px] px-2 py-1 text-xs border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-sans"
+                                                        placeholder="Ex: Titre foncier remis, Dossier archivé..."
+                                                        autoFocus
+                                                    />
+                                                    <button
+                                                        onClick={() => handleSaveNotes(item.id)}
+                                                        disabled={updatingId === item.id}
+                                                        className="p-1 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                        title="Enregistrer"
+                                                    >
+                                                        {updatingId === item.id ? (
+                                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                                                        ) : (
+                                                            <Check className="w-4 h-4" />
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setEditingContractId(null)}
+                                                        className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Annuler"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center space-x-2 group max-w-[200px]">
+                                                    <span className="text-xs text-gray-600 truncate font-medium max-w-[150px] block">
+                                                        {item.notes || <span className="text-gray-400 italic font-normal">Aucune remarque</span>}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingContractId(item.id);
+                                                            setEditingNotesText(item.notes || '');
+                                                        }}
+                                                        className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+                                                        title="Modifier la remarque"
+                                                    >
+                                                        <Pencil className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                                             <div className="flex items-center justify-center space-x-3">

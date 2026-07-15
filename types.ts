@@ -120,6 +120,9 @@ export interface Contract {
   previous_contract_id?: string;
   renewed_contract_id?: string;
   rejection_reason?: string;
+  refund_status?: 'none' | 'total' | 'partial';
+  refund_amount?: number;
+  refund_notes?: string;
 }
 
 export interface Payment {

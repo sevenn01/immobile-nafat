@@ -390,12 +390,22 @@ export const updateContract = async (contractId: string, data: Partial<Contract>
   await db.collection('contracts').doc(contractId).update({ ...data, updated_by: userId, updated_at: new Date().toISOString() });
 };
 
-export const cancelContract = async (contract: Contract, userId: string, reason?: string) => {
+export const cancelContract = async (
+    contract: Contract, 
+    userId: string, 
+    reason?: string,
+    refundStatus?: 'none' | 'total' | 'partial',
+    refundAmount?: number,
+    refundNotes?: string
+) => {
     if (isDemo) {
         const idx = mockDb.contracts.findIndex(c => c.id === contract.id);
         if (idx !== -1) {
             mockDb.contracts[idx].status = contract.type === 'sale' ? ContractStatus.SaleCanceled : ContractStatus.Canceled;
             mockDb.contracts[idx].rejection_reason = reason;
+            mockDb.contracts[idx].refund_status = refundStatus;
+            mockDb.contracts[idx].refund_amount = refundAmount;
+            mockDb.contracts[idx].refund_notes = refundNotes;
         }
         const aptIdx = mockDb.apartments.findIndex(a => a.id === contract.apartment_id);
         if (aptIdx !== -1) { 
@@ -415,6 +425,9 @@ export const cancelContract = async (contract: Contract, userId: string, reason?
     batch.update(db.collection('contracts').doc(contract.id), { 
         status: newStatus,
         rejection_reason: reason || 'Non spécifié',
+        refund_status: refundStatus || 'none',
+        refund_amount: refundAmount || 0,
+        refund_notes: refundNotes || '',
         updated_at: new Date().toISOString()
     });
     
