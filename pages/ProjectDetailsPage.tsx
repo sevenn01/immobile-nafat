@@ -10,6 +10,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import ApartmentCard from '../components/ApartmentCard';
 import Notification from '../components/Notification';
 import { PropertyPdfModal } from '../components/PropertyPdfModal';
+import { ReservationModal } from '../components/ReservationModal';
 
 const ProjectDetailsPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -20,6 +21,8 @@ const ProjectDetailsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
+  const [reservationApt, setReservationApt] = useState<Apartment | null>(null);
+  const [isReservationOpen, setIsReservationOpen] = useState(false);
   
   // Creation States
   const [propertyType, setPropertyType] = useState<'apartment' | 'garage'>('apartment');
@@ -231,8 +234,8 @@ const ProjectDetailsPage: React.FC = () => {
                                 onToggleLock={() => setManualLockStates(p => ({...p, [apt.id]: !p[apt.id]}))} 
                                 onEdit={openEditModal} 
                                 onDelete={handleDelete} 
-                                onRent={() => navigate('/reservations')} 
-                                onSell={() => navigate('/reservations')} 
+                                onRent={(a) => { setReservationApt(a); setIsReservationOpen(true); }} 
+                                onSell={(a) => { setReservationApt(a); setIsReservationOpen(true); }} 
                                 onViewContractHolder={handleViewContractHolder} 
                                 onViewPdf={(a) => setPdfApartment(a)}
                             />
@@ -250,6 +253,26 @@ const ProjectDetailsPage: React.FC = () => {
                                     <td className="px-6 py-4 uppercase text-[10px] font-bold">{apt.intended_for === 'sale' ? 'Vente' : 'Loc'}</td>
                                     <td className="px-6 py-4 font-bold">{apt.intended_for === 'sale' ? apt.sale_price_dh?.toLocaleString() : apt.price_dh.toLocaleString()} DH</td>
                                     <td className="px-6 py-4 flex justify-center items-center space-x-3">
+                                        {(apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold) ? (
+                                            <button 
+                                                onClick={() => {
+                                                    const contract = contracts.find(c => c.id === apt.current_contract_id);
+                                                    if (contract) navigate(`/clients/${contract.client_id}`);
+                                                }}
+                                                className="px-2.5 py-1 text-[10px] font-bold text-white bg-gray-900 hover:bg-black rounded-lg transition-all"
+                                                title="Dossier"
+                                            >
+                                                Dossier
+                                            </button>
+                                        ) : (
+                                            <button 
+                                                onClick={() => { setReservationApt(apt); setIsReservationOpen(true); }}
+                                                className={`px-2.5 py-1 text-[10px] font-bold text-white rounded-lg transition-all ${apt.intended_for === 'sale' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'}`}
+                                                title="Réserver"
+                                            >
+                                                Réserver
+                                            </button>
+                                        )}
                                         <FileTextIcon className="w-5 h-5 cursor-pointer hover:text-green-600" onClick={() => setPdfApartment(apt)} title="Fiche Technique / Dossier PDF" />
                                         <EditIcon className="w-5 h-5 cursor-pointer hover:text-green-600" onClick={() => openEditModal(apt)} />
                                         <TrashIcon className="w-5 h-5 cursor-pointer hover:text-red-600" onClick={() => handleDelete(apt)} />
@@ -306,6 +329,17 @@ const ProjectDetailsPage: React.FC = () => {
                 onClose={() => setPdfApartment(null)} 
             />
         )}
+
+        <ReservationModal 
+            isOpen={isReservationOpen} 
+            onClose={() => { setIsReservationOpen(false); setReservationApt(null); }} 
+            apartment={reservationApt} 
+            project={project} 
+            onSuccess={() => {
+                fetchData();
+                setNotification({ message: "Réservation enregistrée avec succès", type: 'success' });
+            }}
+        />
     </div>
   );
 };

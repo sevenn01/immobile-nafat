@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Client, Contract, Apartment, Payment, ContractStatus, PaymentStatus } from '../types';
+import { Client, Contract, Apartment, Payment, Project, ContractStatus, PaymentStatus } from '../types';
 import { CloseIcon, PrinterIcon, DownloadIcon, FileTextIcon, CoinsIcon } from '../components/icons/Icons';
-import { getContracts, getApartments, getPayments } from '../services/api';
+import { getContracts, getApartments, getPayments, getProjects } from '../services/api';
 
 declare global {
     interface Window {
@@ -28,6 +28,7 @@ export const ClientPdfModal: React.FC<ClientPdfModalProps> = ({ client, onClose 
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [apartments, setApartments] = useState<Apartment[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [error, setError] = useState<string | null>(null);
     const pdfRef = useRef<HTMLDivElement>(null);
 
@@ -35,10 +36,11 @@ export const ClientPdfModal: React.FC<ClientPdfModalProps> = ({ client, onClose 
         const loadClientData = async () => {
             try {
                 setLoading(true);
-                const [allContracts, allApartments, allPayments] = await Promise.all([
+                const [allContracts, allApartments, allPayments, allProjects] = await Promise.all([
                     getContracts(),
                     getApartments(),
-                    getPayments()
+                    getPayments(),
+                    getProjects()
                 ]);
 
                 // Filter data for this client
@@ -48,6 +50,7 @@ export const ClientPdfModal: React.FC<ClientPdfModalProps> = ({ client, onClose 
                 setContracts(clientContracts);
                 setApartments(allApartments);
                 setPayments(clientPayments);
+                setProjects(allProjects);
             } catch (err: any) {
                 console.error("Error fetching client PDF data:", err);
                 setError("Impossible de charger le dossier financier.");
@@ -251,6 +254,7 @@ export const ClientPdfModal: React.FC<ClientPdfModalProps> = ({ client, onClose 
                                                     <tr>
                                                         <th className="px-3 py-2 border-r border-gray-300">Réf Contrat</th>
                                                         <th className="px-3 py-2 border-r border-gray-300">Propriété / Unité</th>
+                                                        <th className="px-3 py-2 border-r border-gray-300">Projet</th>
                                                         <th className="px-3 py-2 border-r border-gray-300">Type de Dossier</th>
                                                         <th className="px-3 py-2 border-r border-gray-300">Date d'Effet</th>
                                                         <th className="px-3 py-2 text-right">Montant Global</th>
@@ -259,10 +263,12 @@ export const ClientPdfModal: React.FC<ClientPdfModalProps> = ({ client, onClose 
                                                 <tbody className="divide-y divide-gray-200">
                                                     {activeContractsList.map(c => {
                                                         const apt = apartments.find(a => a.id === c.apartment_id);
+                                                        const proj = projects.find(p => p.id === c.project_id);
                                                         return (
                                                             <tr key={c.id} className="hover:bg-gray-50/50">
                                                                 <td className="px-3 py-2 border-r border-gray-200 font-mono text-gray-600">{c.id.substring(c.id.length - 8).toUpperCase()}</td>
                                                                 <td className="px-3 py-2 border-r border-gray-200 font-bold text-gray-900">{apt?.name || 'N/A'}</td>
+                                                                <td className="px-3 py-2 border-r border-gray-200 font-medium text-gray-800">{proj?.project_name || 'N/A'}</td>
                                                                 <td className="px-3 py-2 border-r border-gray-200">{c.type === 'rental' ? 'Bail de Location' : 'Contrat de Réservation/Vente'}</td>
                                                                 <td className="px-3 py-2 border-r border-gray-200">{c.start_date ? new Date(c.start_date).toLocaleDateString('fr-FR') : 'N/A'}</td>
                                                                 <td className="px-3 py-2 text-right font-bold text-gray-900">{c.amount_dh.toLocaleString('fr-FR')} DH</td>

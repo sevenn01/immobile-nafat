@@ -341,17 +341,21 @@ const ClientsPage: React.FC = () => {
                                         </span>
                                         {(() => {
                                             const clientContracts = contracts.filter(c => c.client_id === client.id);
-                                            const assignedProjects = Array.from(new Set(
-                                                clientContracts.map(c => {
-                                                    const proj = projects.find(p => p.id === c.project_id);
-                                                    return proj ? proj.project_name : null;
-                                                }).filter(Boolean)
-                                            ));
-                                            if (assignedProjects.length > 0) {
+                                            if (clientContracts.length > 0) {
                                                 return (
-                                                    <span className="text-[10px] text-indigo-600 font-bold">
-                                                        {assignedProjects.join(', ')}
-                                                    </span>
+                                                    <div className="flex flex-col gap-1 mt-1">
+                                                        {clientContracts.map(c => {
+                                                            const proj = projects.find(p => p.id === c.project_id);
+                                                            const apt = apartments.find(a => a.id === c.apartment_id);
+                                                            return (
+                                                                <span key={c.id} className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 bg-indigo-50/40 px-1.5 py-0.5 rounded border border-indigo-100/30 w-fit">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
+                                                                    {apt?.name || 'Unité'}
+                                                                    {proj && <span className="text-gray-400 font-medium"> ({proj.project_name})</span>}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 );
                                             }
                                             return null;

@@ -8,6 +8,11 @@ import { useAuth } from '../auth/AuthContext';
 import { CoinsIcon, PrinterIcon, FileTextIcon, XCircleIcon, PaperclipIcon, ClockIcon, TrashIcon } from '../components/icons/Icons';
 import ReceiptPage from './ReceiptPage';
 import ReservationFormPage from './ReservationFormPage';
+import { ClientReservationModal } from '../components/ClientReservationModal';
+import { EditContractModal } from '../components/EditContractModal';
+import { ChangeApartmentModal } from '../components/ChangeApartmentModal';
+import { ClientDesistementModal } from '../components/ClientDesistementModal';
+import { Edit, Plus, RefreshCw, Lock, Undo2 } from 'lucide-react';
 
 // Helper to compress image before saving to Firestore (1MB limit)
 const compressImage = (base64Str: string, maxWidth = 1000, quality = 0.7): Promise<string> => {
@@ -72,6 +77,10 @@ const ClientDetailsPage: React.FC = () => {
     const [reservationContractId, setReservationContractId] = useState<string | null>(null);
     const [paymentForOption, setPaymentForOption] = useState<string>('avance');
     const [customPaymentFor, setCustomPaymentFor] = useState<string>('');
+    const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
+    const [editingContract, setEditingContract] = useState<any | null>(null);
+    const [changingContractApt, setChangingContractApt] = useState<any | null>(null);
+    const [desistingContract, setDesistingContract] = useState<any | null>(null);
 
     const fetchData = useCallback(async () => {
         if (!clientId) return;
@@ -266,9 +275,17 @@ const ClientDetailsPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
                 <div className="lg:col-span-3 space-y-10">
                     <section>
-                        <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-4 md:mb-5 px-2 flex items-center uppercase tracking-tight">
-                            <FileTextIcon className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-indigo-600" /> Dossiers Actifs
-                        </h3>
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 md:mb-5 px-2 gap-3">
+                            <h3 className="text-lg md:text-xl font-bold text-slate-800 flex items-center uppercase tracking-tight">
+                                <FileTextIcon className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-indigo-600" /> Dossiers Actifs
+                            </h3>
+                            <button
+                                onClick={() => setIsReservationModalOpen(true)}
+                                className="px-4 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 flex items-center shadow-lg transition-all active:scale-95"
+                            >
+                                <Plus className="w-4 h-4 mr-1.5" /> Nouvelle Réservation
+                            </button>
+                        </div>
                         <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-slate-100">
@@ -281,32 +298,78 @@ const ClientDetailsPage: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50 font-semibold text-xs md:text-sm">
-                                        {activeContracts.length > 0 ? activeContracts.map(c => (
-                                            <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-4 md:px-6 py-4 md:py-5 text-slate-900">
-                                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                                                        <span className="font-bold">{c.apartmentName}</span>
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 w-fit">
-                                                            {c.projectName}
+                                        {activeContracts.length > 0 ? activeContracts.map(c => {
+                                            const paidPaymentsCount = payments.filter(p => p.contract_id === c.id && p.status === PaymentStatus.Paid).length;
+                                            return (
+                                                <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-4 md:px-6 py-4 md:py-5 text-slate-900">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                                            <span className="font-bold">{c.apartmentName}</span>
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 w-fit">
+                                                                {c.projectName}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400 mt-1">
+                                                            <span className="sm:inline hidden">Total: {c.amount_dh.toLocaleString()} DH • </span>
+                                                            <span className="sm:hidden">Total: {c.amount_dh.toLocaleString()} DH <br /></span>
+                                                            <span className={`font-semibold ${paidPaymentsCount >= 2 ? 'text-amber-600' : 'text-slate-500'}`}>
+                                                                {paidPaymentsCount} versement{paidPaymentsCount > 1 ? 's' : ''} effectué{paidPaymentsCount > 1 ? 's' : ''}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="hidden sm:table-cell px-4 md:px-6 py-4 md:py-5 text-slate-900">{c.amount_dh.toLocaleString()} DH</td>
+                                                    <td className="px-4 md:px-6 py-4 md:py-5">
+                                                        <span className={c.remainingAmount > 0 ? "text-red-600 font-bold" : "text-green-600"}>
+                                                            {c.remainingAmount.toLocaleString()} DH
                                                         </span>
-                                                    </div>
-                                                    <div className="sm:hidden text-[10px] text-slate-400 mt-1">Total: {c.amount_dh.toLocaleString()} DH</div>
-                                                </td>
-                                                <td className="hidden sm:table-cell px-4 md:px-6 py-4 md:py-5 text-slate-900">{c.amount_dh.toLocaleString()} DH</td>
-                                                <td className="px-4 md:px-6 py-4 md:py-5">
-                                                    <span className={c.remainingAmount > 0 ? "text-red-600 font-bold" : "text-green-600"}>
-                                                        {c.remainingAmount.toLocaleString()} DH
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 md:px-6 py-4 md:py-5 text-center">
-                                                    {c.remainingAmount > 0 ? (
-                                                        <button onClick={() => handleOpenPaymentModal(c)} className="mx-auto px-3 md:px-4 py-2 text-[10px] md:text-xs font-bold text-white bg-indigo-600 rounded-lg md:rounded-xl hover:bg-indigo-700 flex items-center shadow-lg transition-all active:scale-95">
-                                                           <CoinsIcon className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1 md:mr-2" /> Encaisser
-                                                        </button>
-                                                    ) : <span className="text-green-500 font-bold text-[9px] md:text-[10px] uppercase bg-green-50 px-2 md:px-3 py-1 rounded-full whitespace-nowrap">Soldé ✓</span>}
-                                                </td>
-                                            </tr>
-                                        )) : (
+                                                    </td>
+                                                    <td className="px-4 md:px-6 py-4 md:py-5 text-center">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            {c.remainingAmount > 0 ? (
+                                                                <button onClick={() => handleOpenPaymentModal(c)} className="px-3 py-2 text-[10px] md:text-xs font-bold text-white bg-indigo-600 rounded-lg md:rounded-xl hover:bg-indigo-700 flex items-center shadow-lg transition-all active:scale-95">
+                                                                   <CoinsIcon className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1" /> Encaisser
+                                                                </button>
+                                                            ) : <span className="text-green-500 font-bold text-[9px] md:text-[10px] uppercase bg-green-50 px-2.5 py-1 rounded-full whitespace-nowrap">Soldé ✓</span>}
+                                                            
+                                                            <button 
+                                                                onClick={() => setEditingContract(c)} 
+                                                                className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg md:rounded-xl flex items-center justify-center transition-all active:scale-95"
+                                                                title="Modifier le dossier"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+
+                                                            {paidPaymentsCount <= 1 ? (
+                                                                <button 
+                                                                    onClick={() => setChangingContractApt(c)} 
+                                                                    className="p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg md:rounded-xl flex items-center justify-center transition-all active:scale-95"
+                                                                    title="Changer d'unité"
+                                                                >
+                                                                    <RefreshCw className="w-4 h-4" />
+                                                                </button>
+                                                            ) : (
+                                                                <>
+                                                                    <button 
+                                                                        disabled
+                                                                        className="p-2 text-slate-300 bg-slate-100 rounded-lg md:rounded-xl flex items-center justify-center cursor-not-allowed"
+                                                                        title="Changement bloqué (2+ versements effectués)"
+                                                                    >
+                                                                        <Lock className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => setDesistingContract(c)} 
+                                                                        className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg md:rounded-xl flex items-center justify-center transition-all active:scale-95"
+                                                                        title="Faire un Désistement (Passer à l'archive)"
+                                                                    >
+                                                                        <Undo2 className="w-4 h-4" />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }) : (
                                             <tr><td colSpan={4} className="p-8 md:p-10 text-center text-slate-400 italic font-medium">Aucun dossier actif.</td></tr>
                                         )}
                                     </tbody>
@@ -506,6 +569,38 @@ const ClientDetailsPage: React.FC = () => {
             
             {receiptPaymentId && <ReceiptPage paymentId={receiptPaymentId} onClose={() => setReceiptPaymentId(null)} />}
             {reservationContractId && <ReservationFormPage contractId={reservationContractId} onClose={() => setReservationContractId(null)} />}
+            {isReservationModalOpen && client && (
+                <ClientReservationModal 
+                    isOpen={isReservationModalOpen} 
+                    onClose={() => setIsReservationModalOpen(false)} 
+                    client={client} 
+                    onSuccess={fetchData} 
+                />
+            )}
+            {editingContract && (
+                <EditContractModal 
+                    isOpen={!!editingContract} 
+                    onClose={() => setEditingContract(null)} 
+                    contract={editingContract} 
+                    onSuccess={fetchData} 
+                />
+            )}
+            {changingContractApt && (
+                <ChangeApartmentModal 
+                    isOpen={!!changingContractApt} 
+                    onClose={() => setChangingContractApt(null)} 
+                    contract={changingContractApt} 
+                    onSuccess={fetchData} 
+                />
+            )}
+            {desistingContract && (
+                <ClientDesistementModal 
+                    isOpen={!!desistingContract} 
+                    onClose={() => setDesistingContract(null)} 
+                    contract={desistingContract} 
+                    onSuccess={fetchData} 
+                />
+            )}
         </div>
     );
 };

@@ -238,8 +238,8 @@ const DashboardPage: React.FC = () => {
                 <DashboardSection title="Impayés Récents" icon={<AlertTriangleIcon className="text-red-500"/>}>
                     {overduePaymentsInfo.length > 0 ? (
                         <ul className="divide-y divide-gray-100 -mx-6 -my-6">
-                            {overduePaymentsInfo.map(({ client, totalOwed }) => (
-                                <li key={client.id} className="py-3 px-6 hover:bg-gray-50 flex justify-between items-center group transition-colors">
+                            {overduePaymentsInfo.map(({ client, contract, totalOwed }) => (
+                                <li key={`${client.id}-${contract.id}`} className="py-3 px-6 hover:bg-gray-50 flex justify-between items-center group transition-colors">
                                     <span className="text-sm font-semibold text-gray-800 group-hover:text-green-600">{client.full_name}</span>
                                     <span className="text-sm font-semibold text-gray-900">{totalOwed.toLocaleString()} DH</span>
                                 </li>
@@ -251,8 +251,8 @@ const DashboardPage: React.FC = () => {
                 <DashboardSection title="Reliquats de Vente" icon={<CoinsIcon className="text-indigo-500" />}>
                      {unsettledSalesInfo.length > 0 ? (
                         <ul className="divide-y divide-gray-100 -mx-6 -my-6">
-                            {unsettledSalesInfo.map(({ client, remaining }) => (
-                                <li key={client?.id} className="py-3 px-6 hover:bg-gray-50 flex justify-between items-center group transition-colors">
+                            {unsettledSalesInfo.map(({ client, contract, remaining }) => (
+                                <li key={`${client?.id || 'unknown'}-${contract.id}`} className="py-3 px-6 hover:bg-gray-50 flex justify-between items-center group transition-colors">
                                     <span className="text-sm font-semibold text-gray-800 group-hover:text-green-600">{client?.full_name}</span>
                                     <span className="text-sm font-semibold text-gray-900">{remaining.toLocaleString()} DH</span>
                                 </li>

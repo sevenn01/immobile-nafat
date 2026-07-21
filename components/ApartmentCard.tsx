@@ -102,7 +102,7 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLoc
                     onClick={() => isSale ? onSell(apartment) : onRent(apartment)} 
                     className={`px-6 py-2.5 text-sm font-semibold text-white rounded-xl transition-all active:scale-95 shadow-lg ${isSale ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-100' : 'bg-green-600 hover:bg-green-700 shadow-green-100'}`}
                 >
-                    {isSale ? 'Vendre' : 'Louer'}
+                    Réserver
                 </button>
             )}
         </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Client, Contract, Apartment, Payment, ContractStatus, PaymentStatus } from '../types';
+import { Client, Contract, Apartment, Payment, Project, ContractStatus, PaymentStatus } from '../types';
 import { CloseIcon, PrinterIcon, DownloadIcon, FileTextIcon, UsersIcon } from '../components/icons/Icons';
-import { getClients, getContracts, getApartments, getPayments } from '../services/api';
+import { getClients, getContracts, getApartments, getPayments, getProjects } from '../services/api';
 
 declare global {
     interface Window {
@@ -21,18 +21,21 @@ export const AllClientsPdfModal: React.FC<AllClientsPdfModalProps> = ({ onClose,
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [apartments, setApartments] = useState<Apartment[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
     const pdfRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const loadAllData = async () => {
             try {
                 setLoading(true);
-                const [allClients, allContracts, allApartments, allPayments] = await Promise.all([
+                const [allClients, allContracts, allApartments, allPayments, allProjects] = await Promise.all([
                     getClients(),
                     getContracts(),
                     getApartments(),
-                    getPayments()
+                    getPayments(),
+                    getProjects()
                 ]);
 
                 // Sort clients alphabetically
@@ -40,6 +43,7 @@ export const AllClientsPdfModal: React.FC<AllClientsPdfModalProps> = ({ onClose,
                 setContracts(allContracts);
                 setApartments(allApartments);
                 setPayments(allPayments);
+                setProjects(allProjects);
             } catch (err: any) {
                 console.error("Error loading global client index PDF data:", err);
                 setError("Impossible de charger le dossier financier.");
@@ -93,14 +97,21 @@ export const AllClientsPdfModal: React.FC<AllClientsPdfModalProps> = ({ onClose,
             contractsCount: clientContracts.length,
             totalCommitted,
             totalPaid,
-            remaining
+            remaining,
+            activeContracts: clientContracts
         };
     });
 
+    // Filter compiled clients by selected project if any
+    const filteredCompiledClientsList = compiledClientsList.filter(c => {
+        if (selectedProjectId === 'all') return true;
+        return c.activeContracts.some(con => con.project_id === selectedProjectId);
+    });
+
     // Global Portfolios Totals
-    const portfolioTotalCommitted = compiledClientsList.reduce((sum, c) => sum + c.totalCommitted, 0);
-    const portfolioTotalPaid = compiledClientsList.reduce((sum, c) => sum + c.totalPaid, 0);
-    const portfolioTotalRemaining = compiledClientsList.reduce((sum, c) => sum + c.remaining, 0);
+    const portfolioTotalCommitted = filteredCompiledClientsList.reduce((sum, c) => sum + c.totalCommitted, 0);
+    const portfolioTotalPaid = filteredCompiledClientsList.reduce((sum, c) => sum + c.totalPaid, 0);
+    const portfolioTotalRemaining = filteredCompiledClientsList.reduce((sum, c) => sum + c.remaining, 0);
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -120,6 +131,19 @@ export const AllClientsPdfModal: React.FC<AllClientsPdfModalProps> = ({ onClose,
                     </div>
 
                     <div className="flex items-center space-x-2">
+                        <div className="mr-3 flex items-center space-x-1.5">
+                            <label className="text-xs text-slate-400 font-bold hidden sm:inline">Projet:</label>
+                            <select 
+                                value={selectedProjectId}
+                                onChange={(e) => setSelectedProjectId(e.target.value)}
+                                className="bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-500 cursor-pointer transition-all"
+                            >
+                                <option value="all">Tous les projets</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.project_name}</option>
+                                ))}
+                            </select>
+                        </div>
                         <div className="mr-3 flex items-center space-x-1.5">
                             <label className="text-xs text-slate-400 font-bold hidden sm:inline">Format:</label>
                             <select 
@@ -207,7 +231,7 @@ export const AllClientsPdfModal: React.FC<AllClientsPdfModalProps> = ({ onClose,
                                     </div>
                                     <div className="text-right">
                                         <h2 className="text-md font-bold uppercase tracking-tight text-gray-900">Registre Général des Clients</h2>
-                                        <p className="text-[8px] font-mono mt-0.5 text-gray-500">Généré le: {new Date().toLocaleDateString('fr-FR')} | Total: {clients.length} clients</p>
+                                        <p className="text-[8px] font-mono mt-0.5 text-gray-500">Généré le: {new Date().toLocaleDateString('fr-FR')} | Total: {filteredCompiledClientsList.length} clients</p>
                                     </div>
                                 </header>
 
@@ -215,7 +239,7 @@ export const AllClientsPdfModal: React.FC<AllClientsPdfModalProps> = ({ onClose,
                                 <section className="mt-4 bg-gray-50 border border-gray-300 p-3 rounded-lg grid grid-cols-4 gap-4 text-center">
                                     <div>
                                         <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Nombre de Clients</p>
-                                        <p className="text-md font-extrabold text-gray-900 mt-0.5">{clients.length}</p>
+                                        <p className="text-md font-extrabold text-gray-900 mt-0.5">{filteredCompiledClientsList.length}</p>
                                     </div>
                                     <div>
                                         <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Valeur Portfolio Engagé</p>
@@ -240,6 +264,7 @@ export const AllClientsPdfModal: React.FC<AllClientsPdfModalProps> = ({ onClose,
                                                     <th className="px-3 py-2 border-r border-gray-300">Nom Complet</th>
                                                     <th className="px-3 py-2 border-r border-gray-300">N° CIN / Passport</th>
                                                     <th className="px-3 py-2 border-r border-gray-300">Téléphone</th>
+                                                    <th className="px-3 py-2 border-r border-gray-300">Projet(s)</th>
                                                     <th className="px-3 py-2 border-r border-gray-300">Adresse Email / Ville</th>
                                                     <th className="px-3 py-2 border-r border-gray-300 text-center">Dossiers Actifs</th>
                                                     <th className="px-3 py-2 border-r border-gray-300 text-right">Valeur Engagée</th>
@@ -248,23 +273,49 @@ export const AllClientsPdfModal: React.FC<AllClientsPdfModalProps> = ({ onClose,
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-200">
-                                                {compiledClientsList.map((c) => (
-                                                    <tr key={c.id} className="hover:bg-gray-50/50">
-                                                        <td className="px-3 py-2 border-r border-gray-200 font-bold text-gray-950">{c.full_name}</td>
-                                                        <td className="px-3 py-2 border-r border-gray-200 font-mono text-gray-700">{c.cin_number}</td>
-                                                        <td className="px-3 py-2 border-r border-gray-200 font-medium text-gray-600">{c.phone}</td>
-                                                        <td className="px-3 py-2 border-r border-gray-200 text-gray-500 truncate max-w-[150px]">{c.email || c.address || 'N/A'}</td>
-                                                        <td className="px-3 py-2 border-r border-gray-200 text-center font-bold text-gray-700">{c.contractsCount}</td>
-                                                        <td className="px-3 py-2 border-r border-gray-200 text-right font-bold text-gray-900">{c.totalCommitted.toLocaleString('fr-FR')} DH</td>
-                                                        <td className="px-3 py-2 border-r border-gray-200 text-right font-bold text-green-700">{c.totalPaid.toLocaleString('fr-FR')} DH</td>
-                                                        <td className="px-3 py-2 text-right font-bold text-red-700">{c.remaining.toLocaleString('fr-FR')} DH</td>
-                                                    </tr>
-                                                ))}
+                                                {filteredCompiledClientsList.map((c) => {
+                                                    const clientContracts = contracts.filter(con => con.client_id === c.id && con.status !== ContractStatus.Canceled && con.status !== ContractStatus.SaleCanceled && con.status !== ContractStatus.Ended);
+                                                    const clientProjectNames = Array.from(new Set(
+                                                        clientContracts.map(con => {
+                                                            const proj = projects.find(p => p.id === con.project_id);
+                                                            return proj ? proj.project_name : null;
+                                                        }).filter(Boolean)
+                                                    )).join(', ') || 'N/A';
+
+                                                    return (
+                                                        <tr key={c.id} className="hover:bg-gray-50/50">
+                                                            <td className="px-3 py-2 border-r border-gray-200 font-bold text-gray-950">{c.full_name}</td>
+                                                            <td className="px-3 py-2 border-r border-gray-200 font-mono text-gray-700">{c.cin_number}</td>
+                                                            <td className="px-3 py-2 border-r border-gray-200 font-medium text-gray-600">{c.phone}</td>
+                                                            <td className="px-3 py-2 border-r border-gray-200 font-medium text-gray-800">
+                                                                <div className="font-bold text-gray-900">{clientProjectNames}</div>
+                                                                {clientContracts.length > 0 && (
+                                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                                        {clientContracts.map(con => {
+                                                                            const apt = apartments.find(a => a.id === con.apartment_id);
+                                                                            return apt ? (
+                                                                                <span key={con.id} className="inline-flex items-center text-[9px] font-extrabold text-green-700 bg-green-50 px-1 py-0.5 rounded border border-green-100">
+                                                                                    <span className="w-1 h-1 bg-green-500 rounded-full mr-1"></span>
+                                                                                    {apt.name}
+                                                                                </span>
+                                                                            ) : null;
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 py-2 border-r border-gray-200 text-gray-500 truncate max-w-[120px]">{c.email || c.address || 'N/A'}</td>
+                                                            <td className="px-3 py-2 border-r border-gray-200 text-center font-bold text-gray-700">{c.contractsCount}</td>
+                                                            <td className="px-3 py-2 border-r border-gray-200 text-right font-bold text-gray-900">{c.totalCommitted.toLocaleString('fr-FR')} DH</td>
+                                                            <td className="px-3 py-2 border-r border-gray-200 text-right font-bold text-green-700">{c.totalPaid.toLocaleString('fr-FR')} DH</td>
+                                                            <td className="px-3 py-2 text-right font-bold text-red-700">{c.remaining.toLocaleString('fr-FR')} DH</td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                             {/* Portfolio Summary footer row inside the sheet */}
                                             <tfoot className="bg-gray-100 font-extrabold border-t border-gray-300">
                                                 <tr>
-                                                    <td colSpan={5} className="px-3 py-2 text-right border-r border-gray-300 uppercase tracking-wider text-gray-600 text-[10px]">TOTAUX PORTFOLIO NAFAT IMMO</td>
+                                                    <td colSpan={6} className="px-3 py-2 text-right border-r border-gray-300 uppercase tracking-wider text-gray-600 text-[10px]">TOTAUX PORTFOLIO NAFAT IMMO</td>
                                                     <td className="px-3 py-2 text-right border-r border-gray-300 text-gray-950">{portfolioTotalCommitted.toLocaleString('fr-FR')} DH</td>
                                                     <td className="px-3 py-2 text-right border-r border-gray-300 text-green-800">{portfolioTotalPaid.toLocaleString('fr-FR')} DH</td>
                                                     <td className="px-3 py-2 text-right text-red-800">{portfolioTotalRemaining.toLocaleString('fr-FR')} DH</td>
@@ -272,86 +323,148 @@ export const AllClientsPdfModal: React.FC<AllClientsPdfModalProps> = ({ onClose,
                                             </tfoot>
                                         </table>
                                     ) : (
-                                        <div className="space-y-6">
-                                            {compiledClientsList.map((c) => {
-                                                const clientPayments = payments.filter(p => p.client_id === c.id && p.status === 'paid');
-                                                const clientContractsList = contracts.filter(con => con.client_id === c.id && con.status !== ContractStatus.Canceled && con.status !== ContractStatus.SaleCanceled && con.status !== ContractStatus.Ended);
-                                                
-                                                const sortedClientPayments = [...clientPayments].sort((a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
-                                                
-                                                let runningSum = 0;
+                                        <div className="space-y-8">
+                                            {(() => {
+                                                const projectsToList = projects.filter(p => {
+                                                    if (selectedProjectId !== 'all' && p.id !== selectedProjectId) return false;
+                                                    return contracts.some(con => 
+                                                        con.project_id === p.id && 
+                                                        con.status !== ContractStatus.Canceled && 
+                                                        con.status !== ContractStatus.SaleCanceled && 
+                                                        con.status !== ContractStatus.Ended
+                                                    );
+                                                });
 
-                                                return (
-                                                    <div key={c.id} className="border border-gray-300 rounded-lg p-4 bg-white page-break-inside-avoid shadow-sm">
-                                                        <div className="flex justify-between items-center border-b border-gray-200 pb-2 mb-3">
-                                                            <div className="flex items-baseline space-x-2">
-                                                                <span className="text-sm font-extrabold text-gray-900 tracking-tight">{c.full_name}</span>
-                                                                <span className="text-[10px] text-gray-400 font-medium">CIN: {c.cin_number} | Tél: {c.phone}</span>
+                                                if (projectsToList.length === 0) {
+                                                    return (
+                                                        <div className="text-center py-10 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 font-bold italic">
+                                                            Aucune donnée de Grand Livre pour ce projet.
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return projectsToList.map(proj => {
+                                                    const projectClients = filteredCompiledClientsList.filter(c => 
+                                                        c.activeContracts.some(con => con.project_id === proj.id)
+                                                    );
+                                                    const sortedProjectClients = [...projectClients].sort((a, b) => a.full_name.localeCompare(b.full_name));
+
+                                                    if (sortedProjectClients.length === 0) return null;
+
+                                                    return (
+                                                        <div key={proj.id} className="space-y-6 page-break-inside-avoid">
+                                                            {/* Project Section Header */}
+                                                            <div className="bg-indigo-900 text-white px-4 py-2.5 rounded-xl flex justify-between items-center shadow-sm">
+                                                                <span className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-2">
+                                                                    <svg className="w-4 h-4 text-indigo-200" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12" />
+                                                                    </svg>
+                                                                    Projet : {proj.project_name}
+                                                                </span>
+                                                                <span className="text-[11px] bg-indigo-800 text-indigo-100 px-3 py-0.5 rounded-full font-bold uppercase">
+                                                                    {sortedProjectClients.length} Client{sortedProjectClients.length > 1 ? 's' : ''}
+                                                                </span>
                                                             </div>
-                                                            <div className="text-xs font-semibold text-gray-700">
-                                                                Engagé: <span className="font-extrabold text-gray-900">{c.totalCommitted.toLocaleString('fr-FR')} DH</span>
+
+                                                            <div className="space-y-6 pl-2">
+                                                                {sortedProjectClients.map((c) => {
+                                                                    const clientContractsList = contracts.filter(con => 
+                                                                        con.client_id === c.id && 
+                                                                        con.project_id === proj.id && 
+                                                                        con.status !== ContractStatus.Canceled && 
+                                                                        con.status !== ContractStatus.SaleCanceled && 
+                                                                        con.status !== ContractStatus.Ended
+                                                                    );
+                                                                    
+                                                                    const clientPayments = payments.filter(p => {
+                                                                        if (p.client_id !== c.id || p.status !== 'paid') return false;
+                                                                        return clientContractsList.some(con => con.id === p.contract_id);
+                                                                    });
+                                                                    
+                                                                    const sortedClientPayments = [...clientPayments].sort((a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
+                                                                    
+                                                                    const projectCommitted = clientContractsList.reduce((sum, con) => sum + con.amount_dh, 0);
+                                                                    const projectPaid = clientPayments.reduce((sum, p) => sum + p.amount_dh, 0);
+                                                                    const projectRemaining = Math.max(0, projectCommitted - projectPaid);
+                                                                    
+                                                                    let runningSum = 0;
+
+                                                                    return (
+                                                                        <div key={c.id} className="border border-gray-300 rounded-lg p-4 bg-white page-break-inside-avoid shadow-sm space-y-3">
+                                                                            <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                                                                                <div className="flex items-baseline space-x-2">
+                                                                                    <span className="text-sm font-extrabold text-gray-900 tracking-tight">{c.full_name}</span>
+                                                                                    <span className="text-[10px] text-gray-400 font-medium">CIN: {c.cin_number} | Tél: {c.phone}</span>
+                                                                                </div>
+                                                                                <div className="text-xs font-semibold text-gray-700">
+                                                                                    Engagé (Projet) : <span className="font-extrabold text-gray-900">{projectCommitted.toLocaleString('fr-FR')} DH</span>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {sortedClientPayments.length === 0 ? (
+                                                                                <p className="text-[10px] text-gray-500 italic px-2 py-1">Aucun versement enregistré pour ce client sur ce projet.</p>
+                                                                            ) : (
+                                                                                <table className="w-full text-[10px] text-left border border-gray-200 rounded overflow-hidden">
+                                                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-b border-gray-200 text-[9px] uppercase tracking-wider">
+                                                                                        <tr>
+                                                                                            <th className="px-3 py-2 border-r border-gray-200">Date Versement</th>
+                                                                                            <th className="px-3 py-2 border-r border-gray-200">Propriété / Unité</th>
+                                                                                            <th className="px-3 py-2 border-r border-gray-200">Description / Libellé</th>
+                                                                                            <th className="px-3 py-2 border-r border-gray-200">Mode de Règlement</th>
+                                                                                            <th className="px-3 py-2 border-r border-gray-200">Statut</th>
+                                                                                            <th className="px-3 py-2 border-r border-gray-200 text-right">Montant réglé</th>
+                                                                                            <th className="px-3 py-2 text-right text-green-700">Cumulé</th>
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                    <tbody className="divide-y divide-gray-100">
+                                                                                        {sortedClientPayments.map(p => {
+                                                                                            const conOfPayment = contracts.find(con => con.id === p.contract_id);
+                                                                                            const apt = apartments.find(a => a.id === conOfPayment?.apartment_id);
+                                                                                            runningSum += p.amount_dh;
+                                                                                            return (
+                                                                                                <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
+                                                                                                    <td className="px-3 py-1.5 border-r border-gray-100 text-gray-600 font-medium">{new Date(p.payment_date).toLocaleDateString('fr-FR')}</td>
+                                                                                                    <td className="px-3 py-1.5 border-r border-gray-100 font-bold text-gray-900">{apt?.name || 'Unité'}</td>
+                                                                                                    <td className="px-3 py-1.5 border-r border-gray-100 text-gray-600">{p.payment_for}</td>
+                                                                                                    <td className="px-3 py-1.5 border-r border-gray-100 capitalize text-gray-500 font-medium">{p.payment_method === 'especes' ? 'Espèces' : p.payment_method === 'cheque' ? 'Chèque' : p.payment_method === 'virement' ? 'Virement' : 'Effet'}</td>
+                                                                                                    <td className="px-3 py-1.5 border-r border-gray-100">
+                                                                                                        <span className="inline-flex items-center px-2 py-0.5 text-[8px] font-extrabold text-green-700 bg-green-50 rounded border border-green-200 uppercase tracking-wider">
+                                                                                                            PAYÉ
+                                                                                                        </span>
+                                                                                                    </td>
+                                                                                                    <td className="px-3 py-1.5 border-r border-gray-100 text-right font-extrabold text-gray-900">{p.amount_dh.toLocaleString('fr-FR')} DH</td>
+                                                                                                    <td className="px-3 py-1.5 text-right font-extrabold text-green-600">{runningSum.toLocaleString('fr-FR')} DH</td>
+                                                                                                </tr>
+                                                                                            );
+                                                                                        })}
+                                                                                    </tbody>
+                                                                                </table>
+                                                                            )}
+
+                                                                            <div className="flex justify-end pt-1">
+                                                                                <div className="inline-flex items-stretch bg-gray-50 border border-gray-200 rounded overflow-hidden text-[10px]">
+                                                                                    <div className="px-3 py-1.5 bg-gray-50 border-r border-gray-200 flex items-center space-x-1.5">
+                                                                                        <span className="text-gray-500 font-semibold">Engagé :</span>
+                                                                                        <span className="text-gray-950 font-extrabold">{projectCommitted.toLocaleString('fr-FR')} DH</span>
+                                                                                    </div>
+                                                                                    <div className="px-3 py-1.5 bg-gray-50 border-r border-gray-200 flex items-center space-x-1.5">
+                                                                                        <span className="text-green-700 font-semibold">Réglé :</span>
+                                                                                        <span className="text-green-600 font-extrabold">{projectPaid.toLocaleString('fr-FR')} DH</span>
+                                                                                    </div>
+                                                                                    <div className="px-3 py-1.5 bg-gray-50 flex items-center space-x-1.5">
+                                                                                        <span className="text-red-700 font-semibold">Reste :</span>
+                                                                                        <span className="text-red-600 font-extrabold">{projectRemaining.toLocaleString('fr-FR')} DH</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
-
-                                                        {sortedClientPayments.length === 0 ? (
-                                                            <p className="text-[10px] text-gray-500 italic px-2 py-1">Aucun versement enregistré pour ce client.</p>
-                                                        ) : (
-                                                            <table className="w-full text-[10px] text-left border border-gray-200 rounded overflow-hidden">
-                                                                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-gray-200 text-[9px] uppercase tracking-wider">
-                                                                    <tr>
-                                                                        <th className="px-3 py-2 border-r border-gray-200">Date Versement</th>
-                                                                        <th className="px-3 py-2 border-r border-gray-200">Propriété / Unité</th>
-                                                                        <th className="px-3 py-2 border-r border-gray-200">Description / Libellé</th>
-                                                                        <th className="px-3 py-2 border-r border-gray-200">Mode de Règlement</th>
-                                                                        <th className="px-3 py-2 border-r border-gray-200">Statut</th>
-                                                                        <th className="px-3 py-2 border-r border-gray-200 text-right">Montant regle</th>
-                                                                        <th className="px-3 py-2 text-right text-green-700">Cummuler</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody className="divide-y divide-gray-100">
-                                                                    {sortedClientPayments.map(p => {
-                                                                        const conOfPayment = contracts.find(con => con.id === p.contract_id);
-                                                                        const apt = apartments.find(a => a.id === conOfPayment?.apartment_id);
-                                                                        runningSum += p.amount_dh;
-                                                                        return (
-                                                                            <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
-                                                                                <td className="px-3 py-1.5 border-r border-gray-100 text-gray-600 font-medium">{new Date(p.payment_date).toLocaleDateString('fr-FR')}</td>
-                                                                                <td className="px-3 py-1.5 border-r border-gray-100 font-bold text-gray-900">{apt?.name || 'Unité'}</td>
-                                                                                <td className="px-3 py-1.5 border-r border-gray-100 text-gray-600">{p.payment_for}</td>
-                                                                                <td className="px-3 py-1.5 border-r border-gray-100 capitalize text-gray-500 font-medium">{p.payment_method === 'especes' ? 'Espèces' : p.payment_method === 'cheque' ? 'Chèque' : p.payment_method === 'virement' ? 'Virement' : 'Effet'}</td>
-                                                                                <td className="px-3 py-1.5 border-r border-gray-100">
-                                                                                    <span className="inline-flex items-center px-2 py-0.5 text-[8px] font-extrabold text-green-700 bg-green-50 rounded border border-green-200 uppercase tracking-wider">
-                                                                                        PAYÉ
-                                                                                    </span>
-                                                                                </td>
-                                                                                <td className="px-3 py-1.5 border-r border-gray-100 text-right font-extrabold text-gray-900">{p.amount_dh.toLocaleString('fr-FR')} DH</td>
-                                                                                <td className="px-3 py-1.5 text-right font-extrabold text-green-600">{runningSum.toLocaleString('fr-FR')} DH</td>
-                                                                            </tr>
-                                                                        );
-                                                                    })}
-                                                                </tbody>
-                                                            </table>
-                                                        )}
-
-                                                        <div className="flex justify-end mt-3">
-                                                            <div className="inline-flex items-stretch bg-gray-50 border border-gray-200 rounded overflow-hidden text-[10px]">
-                                                                <div className="px-3 py-1.5 bg-gray-50 border-r border-gray-200 flex items-center space-x-1.5">
-                                                                    <span className="text-gray-500 font-semibold">Engagé:</span>
-                                                                    <span className="text-gray-950 font-extrabold">{c.totalCommitted.toLocaleString('fr-FR')} DH</span>
-                                                                </div>
-                                                                <div className="px-3 py-1.5 bg-gray-50 border-r border-gray-200 flex items-center space-x-1.5">
-                                                                    <span className="text-green-700 font-semibold">Réglé:</span>
-                                                                    <span className="text-green-600 font-extrabold">{c.totalPaid.toLocaleString('fr-FR')} DH</span>
-                                                                </div>
-                                                                <div className="px-3 py-1.5 bg-gray-50 flex items-center space-x-1.5">
-                                                                    <span className="text-red-700 font-semibold">Reste:</span>
-                                                                    <span className="text-red-600 font-extrabold">{c.remaining.toLocaleString('fr-FR')} DH</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+                                                    );
+                                                });
+                                            })()}
                                         </div>
                                     )}
                                 </section>

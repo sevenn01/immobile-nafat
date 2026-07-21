@@ -174,6 +174,9 @@ export const login = async (email: string, password: string): Promise<User> => {
         await snapshot.docs[0].ref.update({ last_login: new Date().toISOString() });
         return userData;
     } catch (error) {
+        if (error instanceof Error && (error.message === "Utilisateur non trouvé." || error.message === "Mot de passe incorrect.")) {
+            throw error;
+        }
         if (error instanceof Error && error.message.includes('Firestore Error')) throw error;
         handleFirestoreError(error, OperationType.GET, 'users');
     }
@@ -388,6 +391,77 @@ export const updateContract = async (contractId: string, data: Partial<Contract>
       return;
   }
   await db.collection('contracts').doc(contractId).update({ ...data, updated_by: userId, updated_at: new Date().toISOString() });
+};
+
+export const changeContractApartment = async (contractId: string, newApartmentId: string, newAmountDh: number, userId: string) => {
+    if (isDemo) {
+        const contractIdx = mockDb.contracts.findIndex(c => c.id === contractId);
+        if (contractIdx === -1) throw new Error("Dossier non trouvé.");
+        const contract = mockDb.contracts[contractIdx];
+        const oldApartmentId = contract.apartment_id;
+
+        const oldAptIdx = mockDb.apartments.findIndex(a => a.id === oldApartmentId);
+        const newAptIdx = mockDb.apartments.findIndex(a => a.id === newApartmentId);
+        if (newAptIdx === -1) throw new Error("Nouvel appartement non trouvé.");
+
+        const oldApt = mockDb.apartments[oldAptIdx];
+        const newApt = mockDb.apartments[newAptIdx];
+
+        // Restore old apartment status
+        if (oldAptIdx !== -1) {
+            mockDb.apartments[oldAptIdx].status = oldApt.intended_for === 'rental' ? ApartmentStatus.Available : ApartmentStatus.ForSale;
+            mockDb.apartments[oldAptIdx].current_contract_id = "";
+        }
+
+        // Set new apartment status
+        mockDb.apartments[newAptIdx].status = contract.type === 'rental' ? ApartmentStatus.Rented : ApartmentStatus.Sold;
+        mockDb.apartments[newAptIdx].current_contract_id = contractId;
+
+        // Update contract
+        mockDb.contracts[contractIdx] = {
+            ...contract,
+            apartment_id: newApartmentId,
+            project_id: newApt.project_id,
+            amount_dh: newAmountDh,
+            updated_at: new Date().toISOString(),
+            updated_by: userId
+        };
+        return;
+    }
+
+    const batch = db.batch();
+    const contractRef = db.collection('contracts').doc(contractId);
+    const contractSnap = await contractRef.get();
+    if (!contractSnap.exists) throw new Error("Dossier non trouvé.");
+    const contract = contractSnap.data() as Contract;
+    const oldApartmentId = contract.apartment_id;
+
+    const oldAptRef = db.collection('apartments').doc(oldApartmentId);
+    const newAptRef = db.collection('apartments').doc(newApartmentId);
+
+    const oldAptSnap = await oldAptRef.get();
+    const newAptSnap = await newAptRef.get();
+    if (!newAptSnap.exists) throw new Error("Nouvel appartement non trouvé.");
+    const oldApt = oldAptSnap.exists ? (oldAptSnap.data() as Apartment) : null;
+    const newApt = newAptSnap.data() as Apartment;
+
+    if (oldApt) {
+        const restoredStatus = oldApt.intended_for === 'rental' ? ApartmentStatus.Available : ApartmentStatus.ForSale;
+        batch.update(oldAptRef, { status: restoredStatus, current_contract_id: "" });
+    }
+
+    const newStatus = contract.type === 'rental' ? ApartmentStatus.Rented : ApartmentStatus.Sold;
+    batch.update(newAptRef, { status: newStatus, current_contract_id: contractId });
+
+    batch.update(contractRef, {
+        apartment_id: newApartmentId,
+        project_id: newApt.project_id,
+        amount_dh: newAmountDh,
+        updated_at: new Date().toISOString(),
+        updated_by: userId
+    });
+
+    await batch.commit();
 };
 
 export const cancelContract = async (

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getContracts, getClients, getApartments, addContract, cancelContract, getProjects, deleteContract, getPayments } from '../services/api';
 import { Contract, Client, Apartment, ContractStatus, ApartmentStatus, Project, Payment, PaymentStatus, PaymentMethod } from '../types';
 import { PlusIcon, EyeIcon, EditIcon, TrashIcon, SearchIcon, XCircleIcon, FileTextIcon, HomeIcon, UsersIcon, AlertTriangleIcon, PaperclipIcon, CloseIcon, PrinterIcon } from '../components/icons/Icons';
@@ -96,6 +96,8 @@ const ContractsPage: React.FC = () => {
     const [fileInputKey, setFileInputKey] = useState(0);
 
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const [backUrl, setBackUrl] = useState<string | null>(null);
     const [reservationContractId, setReservationContractId] = useState<string | null>(null);
     const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null);
     const { user } = useAuth();
@@ -133,14 +135,50 @@ const ContractsPage: React.FC = () => {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     useEffect(() => {
+        if (loading || apartments.length === 0) return;
+        
+        const aptIdParam = searchParams.get('apartmentId');
+        const projIdParam = searchParams.get('projectId');
+        const backUrlParam = searchParams.get('backUrl');
+        
+        if (aptIdParam && projIdParam) {
+            const apt = apartments.find(a => a.id === aptIdParam);
+            if (apt) {
+                setNewContractType(apt.intended_for || 'sale');
+                setSelectedProjectId(projIdParam);
+                setSelectedApartmentId(aptIdParam);
+                setIsModalOpen(true);
+                if (backUrlParam) {
+                    setBackUrl(backUrlParam);
+                }
+                navigate('/reservations', { replace: true });
+            }
+        }
+    }, [searchParams, loading, apartments, navigate]);
+
+    useEffect(() => {
         const apt = apartments.find(a => a.id === selectedApartmentId);
         setSalePrice(String(apt?.sale_price_dh || apt?.price_dh || 0));
     }, [selectedApartmentId, apartments]);
 
     const filteredModalApartments = useMemo(() => {
-        return apartments.filter(a => {
+        const list = apartments.filter(a => {
             const isAvailable = a.status === ApartmentStatus.Available || a.status === ApartmentStatus.ForSale;
             return isAvailable && a.project_id === selectedProjectId;
+        });
+
+        return list.sort((a, b) => {
+            const floorA = a.floor || 'N/A';
+            const floorB = b.floor || 'N/A';
+            if (floorA === floorB) {
+                return a.name.localeCompare(b.name);
+            }
+            if (floorA === 'RDC') return -1;
+            if (floorB === 'RDC') return 1;
+            const numA = parseInt(floorA);
+            const numB = parseInt(floorB);
+            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+            return floorA.localeCompare(floorB);
         });
     }, [apartments, selectedProjectId]);
 
@@ -162,6 +200,15 @@ const ContractsPage: React.FC = () => {
                    minAmountMatch && maxAmountMatch && startDateMatch && endDateMatch;
         });
     }, [contracts, clients, searchTerm, filters]);
+
+    const closeCreationModal = () => {
+        setIsModalOpen(false);
+        if (backUrl) {
+            const url = backUrl;
+            setBackUrl(null);
+            navigate(url);
+        }
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -219,7 +266,7 @@ const ContractsPage: React.FC = () => {
         try { 
             await addContract(data as any, user.user_id, initialPay); 
             await fetchData(); 
-            setIsModalOpen(false); 
+            closeCreationModal(); 
             setNotification({ message: "Dossier enregistré avec succès", type: 'success' });
         } catch(e) { console.error(e); }
     };
@@ -481,7 +528,7 @@ const ContractsPage: React.FC = () => {
         </Modal>
 
         {/* CREATION MODAL */}
-        <Modal title={`Nouveau Dossier - ${newContractType === 'rental' ? 'Location' : 'Vente'}`} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+        <Modal title={`Nouveau Dossier - ${newContractType === 'rental' ? 'Location' : 'Vente'}`} isOpen={isModalOpen} onClose={closeCreationModal}>
             <form onSubmit={handleFormSubmit} className="space-y-4">
                 <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Client</label>
@@ -502,7 +549,11 @@ const ContractsPage: React.FC = () => {
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Propriété</label>
                         <select name="apartment_id" required value={selectedApartmentId} onChange={(e) => setSelectedApartmentId(e.target.value)} className={inputClasses}>
                             <option value="" disabled>Choisir l'unité</option>
-                            {filteredModalApartments.map(a => <option key={a.id} value={a.id}>{a.name} ({a.floor})</option>)}
+                            {filteredModalApartments.map(a => (
+                                <option key={a.id} value={a.id}>
+                                    {a.floor === 'RDC' ? `RDC - ${a.name}` : `Étage ${a.floor} - ${a.name}`}
+                                </option>
+                            ))}
                         </select>
                     </div>
                 </div>
@@ -541,7 +592,7 @@ const ContractsPage: React.FC = () => {
                 <div><label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Notes Internes</label><textarea name="notes" rows={2} className={inputClasses} placeholder="Observations..."></textarea></div>
                 
                 <div className="flex flex-col sm:flex-row justify-end gap-3 pt-5 border-t">
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold order-2 sm:order-1">Annuler</button>
+                    <button type="button" onClick={closeCreationModal} className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold order-2 sm:order-1">Annuler</button>
                     <button type="submit" className="px-6 py-2.5 bg-green-600 text-white rounded-xl font-bold shadow-lg order-1 sm:order-2">Enregistrer</button>
                 </div>
             </form>
