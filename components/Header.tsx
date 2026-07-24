@@ -38,45 +38,62 @@ const Header: React.FC = () => {
 
   return (
     <>
-      <header className="flex items-center justify-between px-4 sm:px-6 py-4 bg-white border-b border-gray-200 no-print">
-        <div className="flex items-center">
+      <header className="flex items-center justify-between px-4 sm:px-6 py-3 bg-white border-b border-slate-200/80 no-print sticky top-0 z-30 shadow-xs">
+        <div className="flex items-center space-x-3">
           <button
             onClick={() => setIsMobileMenuOpen(true)}
-            className="text-gray-500 focus:outline-none md:hidden"
+            className="p-2 rounded-xl text-slate-700 bg-slate-100 hover:bg-slate-200 focus:outline-none md:hidden flex items-center justify-center transition-colors shadow-2xs"
             aria-label="Ouvrir le menu"
           >
-            <MenuIcon className="h-6 w-6" />
+            <MenuIcon className="h-5 w-5" />
           </button>
+          
+          <div className="md:hidden flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span className="font-extrabold text-slate-800 text-sm tracking-tight">Nafat Immobilier</span>
+          </div>
         </div>
+
         <div className="flex items-center">
           <div className="relative">
-            <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center text-left focus:outline-none">
-              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold border border-green-200">
+            <button 
+              onClick={() => setDropdownOpen(!dropdownOpen)} 
+              className="flex items-center text-left focus:outline-none p-1 rounded-xl hover:bg-slate-50 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-800 font-extrabold text-sm border border-emerald-200">
                 {userInitial}
               </div>
               <div className="ml-3 hidden md:block">
-                <p className="text-sm font-medium text-gray-700">{user?.name}</p>
-                <p className="text-xs text-gray-500">{userRole}</p>
+                <p className="text-xs font-bold text-slate-800">{user?.name}</p>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase">{userRole}</p>
               </div>
             </button>
+
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-20 ring-1 ring-black ring-opacity-5">
-                {isDeveloper && (
-                    <button
-                    onClick={handleResetData}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center border-b border-gray-100"
-                    >
-                    <TrashIcon className="w-4 h-4 mr-2" />
-                    Réinitialiser les données
-                    </button>
-                )}
-                <button
-                  onClick={handleLogout}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  Se déconnecter
-                </button>
-              </div>
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl py-1 z-20 border border-slate-100 ring-1 ring-black/5 animate-fade-in">
+                  <div className="px-4 py-2 border-b border-slate-100 md:hidden">
+                    <p className="text-xs font-bold text-slate-800">{user?.name}</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase">{userRole}</p>
+                  </div>
+                  {isDeveloper && (
+                      <button
+                        onClick={handleResetData}
+                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 flex items-center border-b border-slate-100"
+                      >
+                        <TrashIcon className="w-4 h-4 mr-2" />
+                        Réinitialiser les données
+                      </button>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="block w-full text-left px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Se déconnecter
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

@@ -231,6 +231,20 @@ export const ArrowRightIcon: React.FC<IconProps> = ({ className, onClick }) => (
     </svg>
 );
 
+export const ChevronLeftIcon: React.FC<IconProps> = ({ className, onClick, title }) => (
+    <svg onClick={onClick} xmlns="http://www.w3.org/2000/svg" className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {title && <title>{title}</title>}
+        <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+);
+
+export const ChevronRightIcon: React.FC<IconProps> = ({ className, onClick, title }) => (
+    <svg onClick={onClick} xmlns="http://www.w3.org/2000/svg" className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {title && <title>{title}</title>}
+        <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+);
+
 export const SettingsIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="3"></circle>

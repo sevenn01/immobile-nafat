@@ -81,6 +81,7 @@ const ClientDetailsPage: React.FC = () => {
     const [editingContract, setEditingContract] = useState<any | null>(null);
     const [changingContractApt, setChangingContractApt] = useState<any | null>(null);
     const [desistingContract, setDesistingContract] = useState<any | null>(null);
+    const [selectedPropertyFilter, setSelectedPropertyFilter] = useState<string>('all');
 
     const fetchData = useCallback(async () => {
         if (!clientId) return;
@@ -145,7 +146,7 @@ const ClientDetailsPage: React.FC = () => {
         return sorted.length > 0 && sorted[0].id === payment.id;
     }, [payments]);
     
-    const { activeContracts, archivedContracts } = useMemo(() => {
+    const { activeContracts, archivedContracts, globalFinancials } = useMemo(() => {
         const withDetails = contracts.map(contract => {
             const apartment = apartments.find(a => a.id === contract.apartment_id);
             const project = projects.find(p => p.id === contract.project_id);
@@ -158,11 +159,57 @@ const ClientDetailsPage: React.FC = () => {
                 remainingAmount: Math.max(0, contract.amount_dh - totalPaid) 
             };
         });
+        const activeList = withDetails.filter(c => c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled && c.status !== ContractStatus.Ended);
+        const archivedList = withDetails.filter(c => c.status === ContractStatus.Canceled || c.status === ContractStatus.SaleCanceled || c.status === ContractStatus.Ended);
+        
+        const totalValue = activeList.reduce((sum, c) => sum + c.amount_dh, 0);
+        const totalPaid = activeList.reduce((sum, c) => sum + c.totalPaid, 0);
+        const totalRemaining = Math.max(0, totalValue - totalPaid);
+        const percentage = totalValue > 0 ? Math.min(100, Math.round((totalPaid / totalValue) * 100)) : 0;
+
         return {
-            activeContracts: withDetails.filter(c => c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled && c.status !== ContractStatus.Ended),
-            archivedContracts: withDetails.filter(c => c.status === ContractStatus.Canceled || c.status === ContractStatus.SaleCanceled || c.status === ContractStatus.Ended)
+            activeContracts: activeList,
+            archivedContracts: archivedList,
+            globalFinancials: {
+                totalValue,
+                totalPaid,
+                totalRemaining,
+                percentage,
+                count: activeList.length
+            }
         };
     }, [contracts, apartments, payments, projects]);
+
+    const paymentsByProperty = useMemo(() => {
+        const groups = contracts.map(contract => {
+            const apartment = apartments.find(a => a.id === contract.apartment_id);
+            const project = projects.find(p => p.id === contract.project_id);
+            const contractPayments = payments.filter(p => p.contract_id === contract.id);
+            const totalPaid = contractPayments.filter(p => p.status === PaymentStatus.Paid).reduce((sum, p) => sum + p.amount_dh, 0);
+            const floorText = apartment?.floor ? (apartment.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${apartment.floor}`) : null;
+            const isArchived = contract.status === ContractStatus.Canceled || contract.status === ContractStatus.SaleCanceled || contract.status === ContractStatus.Ended;
+
+            return {
+                contract,
+                apartmentName: apartment?.name || 'Unité Inconnue',
+                projectName: project?.project_name || 'Projet Inconnu',
+                floorText,
+                totalAmount: contract.amount_dh,
+                totalPaid,
+                remainingAmount: Math.max(0, contract.amount_dh - totalPaid),
+                payments: contractPayments,
+                isArchived
+            };
+        });
+
+        const knownContractIds = new Set(contracts.map(c => c.id));
+        const orphanPayments = payments.filter(p => !p.contract_id || !knownContractIds.has(p.contract_id));
+
+        return {
+            groups,
+            orphanPayments
+        };
+    }, [contracts, apartments, projects, payments]);
 
     const handleOpenPaymentModal = (contract: Contract) => {
         setSelectedContract(contract);
@@ -271,6 +318,70 @@ const ClientDetailsPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Global Multi-Reservation Financial Summary Card */}
+            {activeContracts.length > 0 && (
+                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 rounded-2xl md:rounded-3xl p-5 md:p-7 text-white shadow-xl border border-slate-700/60 relative overflow-hidden">
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 relative z-10">
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-3 py-1 rounded-full flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    Synthèse Client ({globalFinancials.count} {globalFinancials.count > 1 ? 'Propriétés réservées' : 'Propriété réservée'})
+                                </span>
+                            </div>
+                            <h3 className="text-xl md:text-2xl font-bold tracking-tight text-white pt-1">
+                                Récapitulatif Financier Global
+                            </h3>
+                            <p className="text-xs text-slate-300">
+                                Totaux cumulés des contrats de vente/réservation pour ce client.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 xl:w-2/3">
+                            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Valeur Totale Biens</p>
+                                <p className="text-lg md:text-xl font-extrabold text-white mt-1">
+                                    {globalFinancials.totalValue.toLocaleString()} <span className="text-xs font-medium text-slate-300">DH</span>
+                                </p>
+                            </div>
+                            <div className="bg-emerald-500/20 backdrop-blur-md p-4 rounded-2xl border border-emerald-500/30">
+                                <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider">Total Réglé (Payé)</p>
+                                <p className="text-lg md:text-xl font-extrabold text-emerald-400 mt-1">
+                                    {globalFinancials.totalPaid.toLocaleString()} <span className="text-xs font-medium text-emerald-200">DH</span>
+                                </p>
+                            </div>
+                            <div className="bg-amber-500/20 backdrop-blur-md p-4 rounded-2xl border border-amber-500/30">
+                                <p className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Reliquat / Reste Global</p>
+                                <p className="text-lg md:text-xl font-extrabold text-amber-300 mt-1">
+                                    {globalFinancials.totalRemaining.toLocaleString()} <span className="text-xs font-medium text-amber-200">DH</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Progress Bar & Details */}
+                    <div className="mt-6 pt-4 border-t border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-3 flex-1">
+                            <span className="text-slate-300 font-semibold text-[11px]">Taux d'encaissement global:</span>
+                            <div className="flex-1 max-w-xs bg-slate-700/80 rounded-full h-2.5 overflow-hidden">
+                                <div 
+                                    className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+                                    style={{ width: `${globalFinancials.percentage}%` }}
+                                />
+                            </div>
+                            <span className="font-extrabold text-emerald-400">{globalFinancials.percentage}%</span>
+                        </div>
+                        <div className="text-[11px] text-slate-300 font-medium flex items-center gap-2">
+                            {activeContracts.map(c => (
+                                <span key={c.id} className="bg-slate-800/80 border border-slate-700 px-2 py-0.5 rounded text-[10px] font-semibold text-slate-200">
+                                    {c.apartmentName} ({c.projectName})
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
                 <div className="lg:col-span-3 space-y-10">
@@ -385,69 +496,206 @@ const ClientDetailsPage: React.FC = () => {
                         </div>
                     </section>
 
-                    <section>
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 md:mb-5 px-2 gap-3">
-                            <h3 className="text-lg md:text-xl font-bold text-slate-800 flex items-center uppercase tracking-tight">
-                                <ClockIcon className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-green-600" /> Historique Versements
-                            </h3>
+                    <section className="space-y-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-2 gap-3">
+                            <div>
+                                <h3 className="text-lg md:text-xl font-bold text-slate-800 flex items-center uppercase tracking-tight">
+                                    <ClockIcon className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-green-600" /> Historique Versements par Propriété
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                                    Chaque bien dispose de son propre suivi distinct des versements.
+                                </p>
+                            </div>
+
+                            {paymentsByProperty.groups.length > 1 && (
+                                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/80 self-stretch sm:self-auto overflow-x-auto">
+                                    <button
+                                        onClick={() => setSelectedPropertyFilter('all')}
+                                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+                                            selectedPropertyFilter === 'all'
+                                                ? 'bg-white text-indigo-700 shadow-xs'
+                                                : 'text-slate-600 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        Toutes ({paymentsByProperty.groups.length})
+                                    </button>
+                                    {paymentsByProperty.groups.map(g => (
+                                        <button
+                                            key={g.contract.id}
+                                            onClick={() => setSelectedPropertyFilter(g.contract.id)}
+                                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                                                selectedPropertyFilter === g.contract.id
+                                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            <span>🏢 {g.apartmentName}</span>
+                                            <span className="text-[10px] opacity-80">({g.payments.length})</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-slate-100">
-                                    <thead className="bg-slate-50 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase">
-                                        <tr>
-                                            <th className="px-4 md:px-6 py-4 text-left">Date</th>
-                                            <th className="px-4 md:px-6 py-4 text-left">Montant</th>
-                                            <th className="hidden sm:table-cell px-4 md:px-6 py-4 text-left">Objet</th>
-                                            <th className="px-4 md:px-6 py-4 text-center">Statut</th>
-                                            <th className="px-4 md:px-6 py-4 text-center">Documents</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50 font-semibold text-xs md:text-sm">
-                                        {payments.length > 0 ? payments.map(p => (
-                                            <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-4 md:px-6 py-4 text-slate-400 font-medium">{new Date(p.payment_date).toLocaleDateString('fr-FR')}</td>
-                                                <td className="px-4 md:px-6 py-4 md:py-4 text-slate-900 font-bold whitespace-nowrap">
-                                                    {p.amount_dh.toLocaleString()} DH
-                                                    <div className="sm:hidden text-[9px] text-slate-400 font-medium truncate max-w-[100px]">{p.payment_for}</div>
-                                                </td>
-                                                <td className="hidden sm:table-cell px-4 md:px-6 py-4 md:py-4 text-slate-500 font-medium">
-                                                    {p.payment_for}
-                                                    {isInitialPayment(p) && (
-                                                        <span className="ml-2 px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[8px] rounded border border-blue-100">INITIAL</span>
+
+                        {paymentsByProperty.groups.length > 0 ? (
+                            paymentsByProperty.groups
+                                .filter(g => selectedPropertyFilter === 'all' || selectedPropertyFilter === g.contract.id)
+                                .map(group => (
+                                    <div key={group.contract.id} className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                                        {/* Header Bar for this Property */}
+                                        <div className="bg-slate-900 text-white p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-sm md:text-base font-extrabold text-white flex items-center gap-1.5">
+                                                        🏢 {group.apartmentName}
+                                                    </span>
+                                                    <span className="text-[10px] font-bold bg-indigo-900/90 text-indigo-200 border border-indigo-700/60 px-2 py-0.5 rounded-md">
+                                                        {group.projectName}
+                                                    </span>
+                                                    {group.floorText && (
+                                                        <span className="text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 px-2 py-0.5 rounded-md">
+                                                            {group.floorText}
+                                                        </span>
                                                     )}
-                                                </td>
-                                                <td className="px-4 md:px-6 py-4 text-center"><span className={getPaymentStatusBadge(p.status).replace('text-[10px]', 'text-[8px] md:text-[10px]')}>{p.status}</span></td>
-                                                <td className="px-4 md:px-6 py-4 text-center">
-                                                    <div className="flex items-center justify-center gap-1.5">
-                                                        {isInitialPayment(p) && (
-                                                            <button 
-                                                                onClick={() => setReservationContractId(p.contract_id)} 
-                                                                className="p-2 md:px-2.5 md:py-1.5 text-[10px] font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg flex items-center justify-center transition duration-150 shadow-md active:scale-95 whitespace-nowrap" 
-                                                                title="Accéder au Bon de réservation"
-                                                            >
-                                                                <FileTextIcon className="w-4 h-4 md:w-3.5 md:h-3.5 md:mr-1 shrink-0" />
-                                                                <span className="hidden md:inline">Bon Réservation</span>
-                                                            </button>
-                                                        )}
+                                                    {group.isArchived && (
+                                                        <span className="text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md">
+                                                            Archivé
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[11px] text-slate-300 font-medium pt-0.5">
+                                                    Prix: <strong className="text-white">{group.totalAmount.toLocaleString()} DH</strong> • Reglé: <strong className="text-emerald-400">{group.totalPaid.toLocaleString()} DH</strong>
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                                <div className="text-right">
+                                                    <div className="text-[9px] uppercase font-bold text-slate-400">Solde Reliquat</div>
+                                                    <div className={`text-sm md:text-base font-black ${group.remainingAmount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                                        {group.remainingAmount > 0 ? `${group.remainingAmount.toLocaleString()} DH` : 'Soldé ✓'}
+                                                    </div>
+                                                </div>
+                                                {!group.isArchived && group.remainingAmount > 0 && (
+                                                    <button
+                                                        onClick={() => handleOpenPaymentModal(group.contract)}
+                                                        className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl flex items-center gap-1 shadow-md transition-all active:scale-95 ml-2"
+                                                    >
+                                                        <CoinsIcon className="w-3.5 h-3.5" /> Encaisser
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Table of payments for this property */}
+                                        <div className="overflow-x-auto">
+                                            <table className="min-w-full divide-y divide-slate-100">
+                                                <thead className="bg-slate-50 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase">
+                                                    <tr>
+                                                        <th className="px-4 md:px-6 py-3.5 text-left">Date</th>
+                                                        <th className="px-4 md:px-6 py-3.5 text-left">Montant</th>
+                                                        <th className="hidden sm:table-cell px-4 md:px-6 py-3.5 text-left">Objet</th>
+                                                        <th className="px-4 md:px-6 py-3.5 text-center">Statut</th>
+                                                        <th className="px-4 md:px-6 py-3.5 text-center">Documents</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50 font-semibold text-xs md:text-sm">
+                                                    {group.payments.length > 0 ? (
+                                                        group.payments.map(p => (
+                                                            <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                                                                <td className="px-4 md:px-6 py-4 text-slate-400 font-medium">{new Date(p.payment_date).toLocaleDateString('fr-FR')}</td>
+                                                                <td className="px-4 md:px-6 py-4 md:py-4 text-slate-900 font-bold whitespace-nowrap">
+                                                                    {p.amount_dh.toLocaleString()} DH
+                                                                    <div className="sm:hidden text-[9px] text-slate-400 font-medium truncate max-w-[100px]">{p.payment_for}</div>
+                                                                </td>
+                                                                <td className="hidden sm:table-cell px-4 md:px-6 py-4 md:py-4 text-slate-500 font-medium">
+                                                                    {p.payment_for}
+                                                                    {isInitialPayment(p) && (
+                                                                        <span className="ml-2 px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[8px] font-bold rounded border border-blue-100">INITIAL</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-4 md:px-6 py-4 text-center">
+                                                                    <span className={getPaymentStatusBadge(p.status).replace('text-[10px]', 'text-[8px] md:text-[10px]')}>{p.status}</span>
+                                                                </td>
+                                                                <td className="px-4 md:px-6 py-4 text-center">
+                                                                    <div className="flex items-center justify-center gap-1.5">
+                                                                        {isInitialPayment(p) && (
+                                                                            <button 
+                                                                                onClick={() => setReservationContractId(p.contract_id)} 
+                                                                                className="p-2 md:px-2.5 md:py-1.5 text-[10px] font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg flex items-center justify-center transition duration-150 shadow-md active:scale-95 whitespace-nowrap" 
+                                                                                title="Accéder au Bon de réservation"
+                                                                            >
+                                                                                <FileTextIcon className="w-4 h-4 md:w-3.5 md:h-3.5 md:mr-1 shrink-0" />
+                                                                                <span className="hidden md:inline">Bon Réservation</span>
+                                                                            </button>
+                                                                        )}
+                                                                        <button 
+                                                                            onClick={() => setReceiptPaymentId(p.id)} 
+                                                                            className="p-2 md:px-2.5 md:py-1.5 text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center justify-center transition duration-150 shadow-sm active:scale-95 whitespace-nowrap" 
+                                                                            title="Imprimer le reçu"
+                                                                        >
+                                                                            <PrinterIcon className="w-4 h-4 md:w-3.5 md:h-3.5 md:mr-1 shrink-0" />
+                                                                            <span className="hidden md:inline">Reçu</span>
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    ) : (
+                                                        <tr>
+                                                            <td colSpan={5} className="p-8 text-center text-slate-400 italic font-medium">
+                                                                Aucun versement enregistré pour cette propriété.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                ))
+                        ) : (
+                            <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 p-8 text-center text-slate-400 italic font-medium">
+                                Aucun versement enregistré.
+                            </div>
+                        )}
+
+                        {paymentsByProperty.orphanPayments.length > 0 && (
+                            <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="bg-slate-100 p-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
+                                    Autres versements non-affiliés
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-slate-100">
+                                        <thead className="bg-slate-50 font-semibold text-slate-400 text-[9px] md:text-[10px] uppercase">
+                                            <tr>
+                                                <th className="px-4 md:px-6 py-3.5 text-left">Date</th>
+                                                <th className="px-4 md:px-6 py-3.5 text-left">Montant</th>
+                                                <th className="px-4 md:px-6 py-3.5 text-left">Objet</th>
+                                                <th className="px-4 md:px-6 py-3.5 text-center">Statut</th>
+                                                <th className="px-4 md:px-6 py-3.5 text-center">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50 font-semibold text-xs md:text-sm">
+                                            {paymentsByProperty.orphanPayments.map(p => (
+                                                <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-4 md:px-6 py-4 text-slate-400 font-medium">{new Date(p.payment_date).toLocaleDateString('fr-FR')}</td>
+                                                    <td className="px-4 md:px-6 py-4 text-slate-900 font-bold">{p.amount_dh.toLocaleString()} DH</td>
+                                                    <td className="px-4 md:px-6 py-4 text-slate-500 font-medium">{p.payment_for}</td>
+                                                    <td className="px-4 md:px-6 py-4 text-center"><span className={getPaymentStatusBadge(p.status)}>{p.status}</span></td>
+                                                    <td className="px-4 md:px-6 py-4 text-center">
                                                         <button 
                                                             onClick={() => setReceiptPaymentId(p.id)} 
-                                                            className="p-2 md:px-2.5 md:py-1.5 text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center justify-center transition duration-150 shadow-sm active:scale-95 whitespace-nowrap" 
-                                                            title="Imprimer le reçu"
+                                                            className="p-2 text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg inline-flex items-center"
                                                         >
-                                                            <PrinterIcon className="w-4 h-4 md:w-3.5 md:h-3.5 md:mr-1 shrink-0" />
-                                                            <span className="hidden md:inline">Reçu</span>
+                                                            <PrinterIcon className="w-3.5 h-3.5 mr-1" /> Reçu
                                                         </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )) : (
-                                            <tr><td colSpan={5} className="p-8 md:p-10 text-center text-slate-400 italic font-medium">Aucun versement.</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </section>
                 </div>
 
