@@ -300,6 +300,8 @@ const ClientDetailsPage: React.FC = () => {
                                     <tbody className="divide-y divide-slate-50 font-semibold text-xs md:text-sm">
                                         {activeContracts.length > 0 ? activeContracts.map(c => {
                                             const paidPaymentsCount = payments.filter(p => p.contract_id === c.id && p.status === PaymentStatus.Paid).length;
+                                            const apt = apartments.find(a => a.id === c.apartment_id);
+                                            const floorText = apt?.floor ? (apt.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${apt.floor}`) : null;
                                             return (
                                                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="px-4 md:px-6 py-4 md:py-5 text-slate-900">
@@ -308,6 +310,11 @@ const ClientDetailsPage: React.FC = () => {
                                                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 w-fit">
                                                                 {c.projectName}
                                                             </span>
+                                                            {floorText && (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/60 w-fit">
+                                                                    🏢 {floorText}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div className="text-[10px] text-slate-400 mt-1">
                                                             <span className="sm:inline hidden">Total: {c.amount_dh.toLocaleString()} DH • </span>
@@ -451,16 +458,27 @@ const ClientDetailsPage: React.FC = () => {
                         </h3>
                         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="p-6 space-y-4">
-                                {archivedContracts.length > 0 ? archivedContracts.map(c => (
-                                    <div key={c.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center group hover:bg-slate-100 transition-colors">
-                                        <div>
-                                            <p className="text-sm font-bold text-slate-800">{c.apartmentName}</p>
-                                            <p className="text-[10px] text-indigo-600 font-bold mt-1">{c.projectName}</p>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">Dossier archivé</p>
+                                {archivedContracts.length > 0 ? archivedContracts.map(c => {
+                                    const apt = apartments.find(a => a.id === c.apartment_id);
+                                    const floorText = apt?.floor ? (apt.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${apt.floor}`) : null;
+                                    return (
+                                        <div key={c.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center group hover:bg-slate-100 transition-colors">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-bold text-slate-800">{c.apartmentName}</p>
+                                                    {floorText && (
+                                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                                                            {floorText}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[10px] text-indigo-600 font-bold mt-1">{c.projectName}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">Dossier archivé</p>
+                                            </div>
+                                            <span className={getContractStatusBadge(c.status)}>{c.status}</span>
                                         </div>
-                                        <span className={getContractStatusBadge(c.status)}>{c.status}</span>
-                                    </div>
-                                )) : (
+                                    );
+                                }) : (
                                     <p className="p-6 text-center text-slate-400 italic text-sm font-medium">Aucune archive disponible.</p>
                                 )}
                             </div>

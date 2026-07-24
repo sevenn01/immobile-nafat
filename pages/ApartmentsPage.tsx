@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { getApartments, getProjects, addApartment, updateApartment, deleteApartment, getContracts, getClients } from '../services/api';
-import { Apartment, Project, ApartmentStatus, Contract, Client } from '../types';
+import { getApartments, getProjects, addApartment, updateApartment, deleteApartment, getContracts, getClients, getPayments } from '../services/api';
+import { Apartment, Project, ApartmentStatus, Contract, Client, Payment, PaymentStatus, ContractStatus } from '../types';
 import { PlusIcon, EditIcon, TrashIcon, HomeIcon, GarageIcon, SearchIcon, XCircleIcon, GridIcon, ListIcon, BuildingIcon, FileTextIcon } from '../components/icons/Icons';
 import Modal from '../components/Modal';
 import { useAuth } from '../auth/AuthContext';
@@ -12,16 +12,19 @@ import Notification from '../components/Notification';
 import { PropertyPdfModal } from '../components/PropertyPdfModal';
 import { AllPropertiesPdfModal } from '../components/AllPropertiesPdfModal';
 import { ReservationModal } from '../components/ReservationModal';
+import { OccupantQuickInfoModal } from '../components/OccupantQuickInfoModal';
 
 const ApartmentsPage: React.FC = () => {
     const [apartments, setApartments] = useState<Apartment[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
     const [reservationApt, setReservationApt] = useState<Apartment | null>(null);
+    const [quickInfoApt, setQuickInfoApt] = useState<Apartment | null>(null);
     const [isReservationOpen, setIsReservationOpen] = useState(false);
     
     // Form States
@@ -63,8 +66,8 @@ const ApartmentsPage: React.FC = () => {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const [apts, projs, ctrs, cls] = await Promise.all([ getApartments(), getProjects(), getContracts(), getClients() ]);
-            setApartments(apts); setProjects(projs); setContracts(ctrs); setClients(cls);
+            const [apts, projs, ctrs, cls, pmts] = await Promise.all([ getApartments(), getProjects(), getContracts(), getClients(), getPayments() ]);
+            setApartments(apts); setProjects(projs); setContracts(ctrs); setClients(cls); setPayments(pmts);
         } catch (error) { 
             console.error(error);
         } finally { setLoading(false); }
@@ -430,21 +433,31 @@ const ApartmentsPage: React.FC = () => {
                                 </span>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-                                {floorApts.map(apt => (
-                                    <ApartmentCard 
-                                        key={apt.id} 
-                                        apartment={apt} 
-                                        project={projects.find(p => p.id === apt.project_id)} 
-                                        onEdit={openEditModal} 
-                                        onDelete={(a) => { setApartmentToDelete(a); setIsConfirmModalOpen(true); }} 
-                                        onRent={(a) => { setReservationApt(a); setIsReservationOpen(true); }} 
-                                        onSelect={handleToggleSelect}
-                                        isSelected={selectedApartmentIds.includes(apt.id)}
-                                        onSell={(a) => { setReservationApt(a); setIsReservationOpen(true); }} 
-                                        onViewContractHolder={(a) => navigate(`/clients/${contracts.find(c => c.id === a.current_contract_id)?.client_id}`)} 
-                                        onViewPdf={(a) => setPdfApartment(a)}
-                                    />
-                                ))}
+                                {floorApts.map(apt => {
+                                    const contract = contracts.find(c => c.id === apt.current_contract_id || (c.apartment_id === apt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
+                                    const client = clients.find(cl => cl.id === contract?.client_id);
+                                    return (
+                                        <ApartmentCard 
+                                            key={apt.id} 
+                                            apartment={apt} 
+                                            project={projects.find(p => p.id === apt.project_id)} 
+                                            contract={contract}
+                                            client={client}
+                                            onEdit={openEditModal} 
+                                            onDelete={(a) => { setApartmentToDelete(a); setIsConfirmModalOpen(true); }} 
+                                            onRent={(a) => { setReservationApt(a); setIsReservationOpen(true); }} 
+                                            onSelect={handleToggleSelect}
+                                            isSelected={selectedApartmentIds.includes(apt.id)}
+                                            onSell={(a) => { setReservationApt(a); setIsReservationOpen(true); }} 
+                                            onViewContractHolder={(a) => {
+                                                const ctr = contracts.find(c => c.id === a.current_contract_id || (c.apartment_id === a.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
+                                                if (ctr) navigate(`/clients/${ctr.client_id}`);
+                                            }} 
+                                            onQuickInfo={(a) => setQuickInfoApt(a)}
+                                            onViewPdf={(a) => setPdfApartment(a)}
+                                        />
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}
@@ -504,16 +517,34 @@ const ApartmentsPage: React.FC = () => {
                                                     <div className="text-sm font-medium text-gray-600">{projects.find(p => p.id === apt.project_id)?.project_name || '-'}</div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className={`px-2 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-tight ${
-                                                        (apt.status === ApartmentStatus.Available || apt.status === ApartmentStatus.ForSale)
-                                                            ? (apt.intended_for === 'sale' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700')
-                                                            : (apt.status === ApartmentStatus.Rented ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700')
-                                                    }`}>
-                                                        {apt.status === ApartmentStatus.Rented ? 'Loué' : 
-                                                         apt.intended_for === 'sale' 
-                                                            ? ((apt.status === ApartmentStatus.Available || apt.status === ApartmentStatus.ForSale) ? 'A VENDRE' : 'RESERVE')
-                                                            : ((apt.status === ApartmentStatus.Available || apt.status === ApartmentStatus.ForSale) ? 'Disponible' : 'Vendu')}
-                                                    </span>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className={`px-2 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-tight w-fit ${
+                                                            (apt.status === ApartmentStatus.Available || apt.status === ApartmentStatus.ForSale)
+                                                                ? (apt.intended_for === 'sale' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700')
+                                                                : (apt.status === ApartmentStatus.Rented ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700')
+                                                        }`}>
+                                                            {apt.status === ApartmentStatus.Rented ? 'Loué' : 
+                                                             apt.intended_for === 'sale' 
+                                                                ? ((apt.status === ApartmentStatus.Available || apt.status === ApartmentStatus.ForSale) ? 'A VENDRE' : 'RESERVE')
+                                                                : ((apt.status === ApartmentStatus.Available || apt.status === ApartmentStatus.ForSale) ? 'Disponible' : 'Vendu')}
+                                                        </span>
+                                                        {(() => {
+                                                            const isOccupied = apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold;
+                                                            if (!isOccupied) return null;
+                                                            const ctr = contracts.find(c => c.id === apt.current_contract_id || (c.apartment_id === apt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
+                                                            const cl = clients.find(c => c.id === ctr?.client_id);
+                                                            if (!cl) return null;
+                                                            return (
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); setQuickInfoApt(apt); }}
+                                                                    className="flex items-center gap-1 text-[11px] font-bold text-slate-800 hover:text-green-700 transition-colors w-fit bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded"
+                                                                >
+                                                                    <span>👤 {cl.full_name}</span>
+                                                                    <span className="text-green-600 font-extrabold text-[10px]">Info ⓘ</span>
+                                                                </button>
+                                                            );
+                                                        })()}
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-gray-500 capitalize">{apt.type === 'apartment' ? 'Logement' : 'Garage'}</td>
                                                 <td className="px-6 py-4 text-right">
@@ -526,7 +557,7 @@ const ApartmentsPage: React.FC = () => {
                                                         {(apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold) ? (
                                                             <button 
                                                                 onClick={() => {
-                                                                    const contract = contracts.find(c => c.id === apt.current_contract_id);
+                                                                    const contract = contracts.find(c => c.id === apt.current_contract_id || (c.apartment_id === apt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
                                                                     if (contract) navigate(`/clients/${contract.client_id}`);
                                                                 }}
                                                                 className="px-2.5 py-1 text-[10px] font-bold text-white bg-gray-900 hover:bg-black rounded-lg transition-all"
@@ -661,6 +692,23 @@ const ApartmentsPage: React.FC = () => {
                     setNotification({ message: "Réservation enregistrée avec succès", type: 'success' });
                 }}
             />
+
+            {quickInfoApt && (() => {
+                const contract = contracts.find(c => c.id === quickInfoApt.current_contract_id || (c.apartment_id === quickInfoApt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
+                const client = clients.find(cl => cl.id === contract?.client_id);
+                const totalPaid = payments.filter(p => p.contract_id === contract?.id && p.status === PaymentStatus.Paid).reduce((sum, p) => sum + p.amount_dh, 0);
+                return (
+                    <OccupantQuickInfoModal
+                        isOpen={!!quickInfoApt}
+                        onClose={() => setQuickInfoApt(null)}
+                        apartment={quickInfoApt}
+                        project={projects.find(p => p.id === quickInfoApt.project_id)}
+                        contract={contract}
+                        client={client}
+                        totalPaid={totalPaid}
+                    />
+                );
+            })()}
         </div>
     );
 };

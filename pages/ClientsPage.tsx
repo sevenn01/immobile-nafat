@@ -77,12 +77,18 @@ const ClientCard: React.FC<{
               {activeContracts.slice(0, 2).map(contract => {
                 const apartment = apartments.find(a => a.id === contract.apartment_id);
                 const project = projects.find(p => p.id === contract.project_id);
+                const floorBadge = apartment?.floor ? (apartment.floor === 'RDC' ? 'RDC' : `Étage ${apartment.floor}`) : null;
                 return (
                   <div key={contract.id} className="flex items-center justify-between p-2 bg-gray-50/50 rounded-xl group-hover:bg-white transition-colors border border-transparent group-hover:border-gray-100">
                     <div className="flex flex-col">
-                        <div className="flex items-center">
-                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2 shadow-lg shadow-green-200"></div>
-                            <span className="text-xs font-semibold text-gray-600 truncate max-w-[120px]">{apartment?.name || 'Unité'}</span>
+                        <div className="flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1 shadow-lg shadow-green-200"></div>
+                            <span className="text-xs font-semibold text-gray-700 truncate max-w-[110px]">{apartment?.name || 'Unité'}</span>
+                            {floorBadge && (
+                                <span className="text-[8px] font-bold text-emerald-800 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-100/60">
+                                    {floorBadge}
+                                </span>
+                            )}
                         </div>
                         {project && (
                             <span className="text-[9px] text-indigo-600 font-bold ml-3.5">
@@ -347,10 +353,16 @@ const ClientsPage: React.FC = () => {
                                                         {clientContracts.map(c => {
                                                             const proj = projects.find(p => p.id === c.project_id);
                                                             const apt = apartments.find(a => a.id === c.apartment_id);
+                                                            const floorText = apt?.floor ? (apt.floor === 'RDC' ? 'RDC' : `Étage ${apt.floor}`) : null;
                                                             return (
                                                                 <span key={c.id} className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 bg-indigo-50/40 px-1.5 py-0.5 rounded border border-indigo-100/30 w-fit">
                                                                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
-                                                                    {apt?.name || 'Unité'}
+                                                                    <span>{apt?.name || 'Unité'}</span>
+                                                                    {floorText && (
+                                                                        <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-1 rounded">
+                                                                            ({floorText})
+                                                                        </span>
+                                                                    )}
                                                                     {proj && <span className="text-gray-400 font-medium"> ({proj.project_name})</span>}
                                                                 </span>
                                                             );

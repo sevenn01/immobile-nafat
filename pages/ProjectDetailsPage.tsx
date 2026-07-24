@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getProjects, getApartments, addApartment, deleteApartment, updateApartment, getContracts, getClients, addContract } from '../services/api';
-import { Project, Apartment, ApartmentStatus, Contract, Client, ContractStatus } from '../types';
+import { getProjects, getApartments, addApartment, deleteApartment, updateApartment, getContracts, getClients, addContract, getPayments } from '../services/api';
+import { Project, Apartment, ApartmentStatus, Contract, Client, ContractStatus, Payment, PaymentStatus } from '../types';
 import { PlusIcon, EditIcon, TrashIcon, HomeIcon, GarageIcon, GridIcon, ListIcon, LockIcon, UnlockIcon, BuildingIcon, FileTextIcon } from '../components/icons/Icons';
 import Modal from '../components/Modal';
 import { useAuth } from '../auth/AuthContext';
@@ -11,6 +11,7 @@ import ApartmentCard from '../components/ApartmentCard';
 import Notification from '../components/Notification';
 import { PropertyPdfModal } from '../components/PropertyPdfModal';
 import { ReservationModal } from '../components/ReservationModal';
+import { OccupantQuickInfoModal } from '../components/OccupantQuickInfoModal';
 
 const ProjectDetailsPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -18,10 +19,12 @@ const ProjectDetailsPage: React.FC = () => {
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingApartment, setEditingApartment] = useState<Apartment | null>(null);
   const [reservationApt, setReservationApt] = useState<Apartment | null>(null);
+  const [quickInfoApt, setQuickInfoApt] = useState<Apartment | null>(null);
   const [isReservationOpen, setIsReservationOpen] = useState(false);
   
   // Creation States
@@ -54,17 +57,19 @@ const ProjectDetailsPage: React.FC = () => {
     if (!projectId) return;
     try {
       setLoading(true);
-      const [projectsData, apartmentsData, contractsData, clientsData] = await Promise.all([
+      const [projectsData, apartmentsData, contractsData, clientsData, paymentsData] = await Promise.all([
           getProjects(),
           getApartments(),
           getContracts(),
-          getClients()
+          getClients(),
+          getPayments()
       ]);
       const currentProject = projectsData.find(p => p.id === projectId) || null;
       setProject(currentProject);
       setApartments(apartmentsData.filter(a => a.project_id === projectId));
       setContracts(contractsData);
       setClients(clientsData);
+      setPayments(paymentsData);
     } catch (error) { console.error(error); } finally { setLoading(false); }
   }, [projectId]);
 
@@ -225,60 +230,87 @@ const ProjectDetailsPage: React.FC = () => {
                 </div>
                 {viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {floorApts.map((apt) => (
-                            <ApartmentCard 
-                                key={apt.id} 
-                                apartment={apt} 
-                                project={project} 
-                                isLocked={manualLockStates[apt.id] !== undefined ? manualLockStates[apt.id] : (apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold)} 
-                                onToggleLock={() => setManualLockStates(p => ({...p, [apt.id]: !p[apt.id]}))} 
-                                onEdit={openEditModal} 
-                                onDelete={handleDelete} 
-                                onRent={(a) => { setReservationApt(a); setIsReservationOpen(true); }} 
-                                onSell={(a) => { setReservationApt(a); setIsReservationOpen(true); }} 
-                                onViewContractHolder={handleViewContractHolder} 
-                                onViewPdf={(a) => setPdfApartment(a)}
-                            />
-                        ))}
+                        {floorApts.map((apt) => {
+                            const contract = contracts.find(c => c.id === apt.current_contract_id || (c.apartment_id === apt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
+                            const client = clients.find(cl => cl.id === contract?.client_id);
+                            return (
+                                <ApartmentCard 
+                                    key={apt.id} 
+                                    apartment={apt} 
+                                    project={project} 
+                                    contract={contract}
+                                    client={client}
+                                    isLocked={manualLockStates[apt.id] !== undefined ? manualLockStates[apt.id] : (apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold)} 
+                                    onToggleLock={() => setManualLockStates(p => ({...p, [apt.id]: !p[apt.id]}))} 
+                                    onEdit={openEditModal} 
+                                    onDelete={handleDelete} 
+                                    onRent={(a) => { setReservationApt(a); setIsReservationOpen(true); }} 
+                                    onSell={(a) => { setReservationApt(a); setIsReservationOpen(true); }} 
+                                    onViewContractHolder={handleViewContractHolder} 
+                                    onQuickInfo={(a) => setQuickInfoApt(a)}
+                                    onViewPdf={(a) => setPdfApartment(a)}
+                                />
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
                             <thead className="bg-gray-50 font-bold text-gray-500 uppercase">
-                                <tr><th className="px-6 py-3 text-left">Nom</th><th className="px-6 py-3 text-left">Usage</th><th className="px-6 py-3 text-left">Prix/Loyer</th><th className="px-6 py-3 text-center">Actions</th></tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">{floorApts.map(apt => (
-                                <tr key={apt.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 font-bold">{apt.name}</td>
-                                    <td className="px-6 py-4 uppercase text-[10px] font-bold">{apt.intended_for === 'sale' ? 'Vente' : 'Loc'}</td>
-                                    <td className="px-6 py-4 font-bold">{apt.intended_for === 'sale' ? apt.sale_price_dh?.toLocaleString() : apt.price_dh.toLocaleString()} DH</td>
-                                    <td className="px-6 py-4 flex justify-center items-center space-x-3">
-                                        {(apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold) ? (
-                                            <button 
-                                                onClick={() => {
-                                                    const contract = contracts.find(c => c.id === apt.current_contract_id);
-                                                    if (contract) navigate(`/clients/${contract.client_id}`);
-                                                }}
-                                                className="px-2.5 py-1 text-[10px] font-bold text-white bg-gray-900 hover:bg-black rounded-lg transition-all"
-                                                title="Dossier"
-                                            >
-                                                Dossier
-                                            </button>
-                                        ) : (
-                                            <button 
-                                                onClick={() => { setReservationApt(apt); setIsReservationOpen(true); }}
-                                                className={`px-2.5 py-1 text-[10px] font-bold text-white rounded-lg transition-all ${apt.intended_for === 'sale' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'}`}
-                                                title="Réserver"
-                                            >
-                                                Réserver
-                                            </button>
-                                        )}
-                                        <FileTextIcon className="w-5 h-5 cursor-pointer hover:text-green-600" onClick={() => setPdfApartment(apt)} title="Fiche Technique / Dossier PDF" />
-                                        <EditIcon className="w-5 h-5 cursor-pointer hover:text-green-600" onClick={() => openEditModal(apt)} />
-                                        <TrashIcon className="w-5 h-5 cursor-pointer hover:text-red-600" onClick={() => handleDelete(apt)} />
-                                    </td>
+                                <tr>
+                                    <th className="px-6 py-3 text-left">Nom / Acquéreur</th>
+                                    <th className="px-6 py-3 text-left">Usage</th>
+                                    <th className="px-6 py-3 text-left">Prix/Loyer</th>
+                                    <th className="px-6 py-3 text-center">Actions</th>
                                 </tr>
-                            ))}</tbody>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">{floorApts.map(apt => {
+                                const isOccupied = apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold;
+                                const contract = contracts.find(c => c.id === apt.current_contract_id || (c.apartment_id === apt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
+                                const client = clients.find(cl => cl.id === contract?.client_id);
+                                return (
+                                    <tr key={apt.id} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-gray-900">{apt.name}</div>
+                                            {isOccupied && client && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setQuickInfoApt(apt); }} 
+                                                    className="mt-1 flex items-center gap-1 text-[11px] font-bold text-slate-800 hover:text-green-700 transition-colors bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded w-fit"
+                                                >
+                                                    <span>👤 {client.full_name}</span>
+                                                    <span className="text-green-600 font-extrabold text-[10px]">Info ⓘ</span>
+                                                </button>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 uppercase text-[10px] font-bold">{apt.intended_for === 'sale' ? 'Vente' : 'Loc'}</td>
+                                        <td className="px-6 py-4 font-bold">{apt.intended_for === 'sale' ? apt.sale_price_dh?.toLocaleString() : apt.price_dh.toLocaleString()} DH</td>
+                                        <td className="px-6 py-4 flex justify-center items-center space-x-2">
+                                            {isOccupied ? (
+                                                <button 
+                                                    onClick={() => {
+                                                        if (contract) navigate(`/clients/${contract.client_id}`);
+                                                    }}
+                                                    className="px-2.5 py-1 text-[10px] font-bold text-white bg-gray-900 hover:bg-black rounded-lg transition-all"
+                                                    title="Dossier"
+                                                >
+                                                    Dossier
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => { setReservationApt(apt); setIsReservationOpen(true); }}
+                                                    className={`px-2.5 py-1 text-[10px] font-bold text-white rounded-lg transition-all ${apt.intended_for === 'sale' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'}`}
+                                                    title="Réserver"
+                                                >
+                                                    Réserver
+                                                </button>
+                                            )}
+                                            <FileTextIcon className="w-5 h-5 cursor-pointer hover:text-green-600" onClick={() => setPdfApartment(apt)} title="Fiche Technique / Dossier PDF" />
+                                            <EditIcon className="w-5 h-5 cursor-pointer hover:text-green-600" onClick={() => openEditModal(apt)} />
+                                            <TrashIcon className="w-5 h-5 cursor-pointer hover:text-red-600" onClick={() => handleDelete(apt)} />
+                                        </td>
+                                    </tr>
+                                );
+                            })}</tbody>
                         </table>
                     </div>
                 )}
@@ -340,6 +372,23 @@ const ProjectDetailsPage: React.FC = () => {
                 setNotification({ message: "Réservation enregistrée avec succès", type: 'success' });
             }}
         />
+
+        {quickInfoApt && (() => {
+            const contract = contracts.find(c => c.id === quickInfoApt.current_contract_id || (c.apartment_id === quickInfoApt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
+            const client = clients.find(cl => cl.id === contract?.client_id);
+            const totalPaid = payments.filter(p => p.contract_id === contract?.id && p.status === PaymentStatus.Paid).reduce((sum, p) => sum + p.amount_dh, 0);
+            return (
+                <OccupantQuickInfoModal
+                    isOpen={!!quickInfoApt}
+                    onClose={() => setQuickInfoApt(null)}
+                    apartment={quickInfoApt}
+                    project={project || undefined}
+                    contract={contract}
+                    client={client}
+                    totalPaid={totalPaid}
+                />
+            );
+        })()}
     </div>
   );
 };

@@ -1,11 +1,14 @@
 
 import React from 'react';
-import { Apartment, ApartmentStatus, Project } from '../types';
+import { Apartment, ApartmentStatus, Project, Client, Contract } from '../types';
 import { HomeIcon, GarageIcon, EditIcon, TrashIcon, BedIcon, BathIcon, SunIcon, FlameIcon, LockIcon, UnlockIcon, BuildingIcon, FileTextIcon } from './icons/Icons';
+import { User, Phone, Info } from 'lucide-react';
 
 interface ApartmentCardProps {
   apartment: Apartment;
   project?: Project;
+  client?: Client;
+  contract?: Contract;
   isLocked?: boolean;
   onToggleLock?: () => void;
   onEdit: (apartment: Apartment) => void;
@@ -16,6 +19,7 @@ interface ApartmentCardProps {
   onSell: (apartment: Apartment) => void;
   onViewContractHolder: (apartment: Apartment) => void;
   onViewPdf?: (apartment: Apartment) => void;
+  onQuickInfo?: (apartment: Apartment) => void;
 }
 
 const translateStatus = (status: ApartmentStatus, intendedFor: 'sale' | 'rental') => {
@@ -61,7 +65,7 @@ const ApartmentAmenity: React.FC<{ icon: React.ReactNode; label: string; availab
     );
 }
 
-const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLocked = false, onToggleLock, onEdit, onDelete, onRent, onSelect, isSelected = false, onSell, onViewContractHolder, onViewPdf }) => {
+const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, client, contract, isLocked = false, onToggleLock, onEdit, onDelete, onRent, onSelect, isSelected = false, onSell, onViewContractHolder, onViewPdf, onQuickInfo }) => {
 
   const handleToggleLock = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -74,7 +78,7 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLoc
     const isOccupied = apartment.status === ApartmentStatus.Rented || apartment.status === ApartmentStatus.Sold;
     
     return (
-        <div className="flex items-center justify-between mt-auto pt-6 border-t border-gray-50">
+        <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-50">
             <div className="flex flex-col">
                 <div className="flex items-baseline space-x-1">
                     <span className="text-xl font-bold text-gray-900">
@@ -91,8 +95,11 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLoc
             {isOccupied ? (
                 <button 
                     type="button" 
-                    onClick={() => onViewContractHolder(apartment)} 
-                    className="px-6 py-2.5 text-sm font-semibold text-white bg-gray-900 rounded-xl hover:bg-black transition-all active:scale-95 shadow-lg shadow-gray-200"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onViewContractHolder(apartment);
+                    }} 
+                    className="px-6 py-2.5 text-xs font-semibold text-white bg-gray-900 rounded-xl hover:bg-black transition-all active:scale-95 shadow-md shadow-gray-200"
                 >
                     Dossier
                 </button>
@@ -219,6 +226,39 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, isLoc
                     available={apartment.kitchen} 
                     colorClass="bg-red-50/50 text-red-600 border-red-100/50"
                 />
+            </div>
+        )}
+
+        {(apartment.status === ApartmentStatus.Rented || apartment.status === ApartmentStatus.Sold) && (
+            <div 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (onQuickInfo) onQuickInfo(apartment);
+                    else onViewContractHolder(apartment);
+                }}
+                className="mb-4 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-slate-100/80 transition-all group/acq"
+            >
+                <div className="flex items-center space-x-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-green-100 text-green-700 flex items-center justify-center font-bold shrink-0">
+                        <User className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Acquéreur / Client</span>
+                        <span className="text-xs font-bold text-slate-800 truncate group-hover/acq:text-green-700 transition-colors">
+                            {client ? client.full_name : 'Voir fiche réservataire'}
+                        </span>
+                        {client?.phone ? (
+                            <span className="text-[10px] text-slate-500 flex items-center font-medium">
+                                <Phone className="w-2.5 h-2.5 mr-1 text-slate-400" />{client.phone}
+                            </span>
+                        ) : (
+                            <span className="text-[9px] text-slate-400 italic">Cliquer pour détails</span>
+                        )}
+                    </div>
+                </div>
+                <span className="text-[10px] font-bold text-green-700 bg-white border border-green-200 px-2 py-1 rounded-lg shrink-0 shadow-xs">
+                    Info ⓘ
+                </span>
             </div>
         )}
 
