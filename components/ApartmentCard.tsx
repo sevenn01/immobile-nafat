@@ -73,22 +73,26 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, clien
       if(onToggleLock) onToggleLock();
   };
 
+  const isOccupied = apartment.status === ApartmentStatus.Rented || apartment.status === ApartmentStatus.Sold || !!contract;
+  const effectiveStatus = isOccupied
+      ? (contract?.type === 'rental' || apartment.intended_for === 'rental' ? ApartmentStatus.Rented : ApartmentStatus.Sold)
+      : apartment.status;
+
   const renderFooter = () => {
     const isSale = apartment.intended_for === 'sale';
-    const isOccupied = apartment.status === ApartmentStatus.Rented || apartment.status === ApartmentStatus.Sold;
     
     return (
         <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-50">
             <div className="flex flex-col">
                 <div className="flex items-baseline space-x-1">
                     <span className="text-xl font-bold text-gray-900">
-                        {(isOccupied ? (apartment.status === ApartmentStatus.Sold && apartment.sale_price_dh ? apartment.sale_price_dh : apartment.price_dh) : (isSale ? (apartment.sale_price_dh || 0) : apartment.price_dh)).toLocaleString()}
+                        {(isOccupied ? (effectiveStatus === ApartmentStatus.Sold && apartment.sale_price_dh ? apartment.sale_price_dh : apartment.price_dh) : (isSale ? (apartment.sale_price_dh || 0) : apartment.price_dh)).toLocaleString()}
                     </span>
                     <span className="text-sm font-semibold text-gray-900">DH</span>
                     {!isSale && !isOccupied && <span className="text-xs font-semibold text-gray-400 ml-1">/ mois</span>}
                 </div>
                 {isOccupied && (
-                    <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mt-0.5" onClick={e => e.stopPropagation()}>Dossier #{apartment.current_contract_id?.substring(0,6)}</span>
+                    <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mt-0.5" onClick={e => e.stopPropagation()}>Dossier #{(apartment.current_contract_id || contract?.id || '').substring(0,6)}</span>
                 )}
             </div>
             
@@ -119,12 +123,12 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, clien
   return (
     <div 
         className={`bg-white rounded-3xl p-6 shadow-sm border border-gray-100/80 transition-all duration-500 flex flex-col group relative overflow-hidden ${
-            (apartment.status === ApartmentStatus.Rented || apartment.status === ApartmentStatus.Sold) ? 'hover:shadow-xl hover:border-green-100' : ''
+            isOccupied ? 'hover:shadow-xl hover:border-green-100' : ''
         } ${isLocked ? 'ring-2 ring-red-100' : ''}`}
     >
       {/* Visual Decoration / "Bubble" Effect */}
       <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-[0.03] transition-all duration-700 group-hover:scale-150 ${
-          apartment.status === ApartmentStatus.Available || apartment.status === ApartmentStatus.ForSale ? 'bg-green-500' : 'bg-gray-500'
+          effectiveStatus === ApartmentStatus.Available || effectiveStatus === ApartmentStatus.ForSale ? 'bg-green-500' : 'bg-gray-500'
       }`}></div>
 
       <div className="relative flex flex-col h-full">
@@ -171,11 +175,15 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, clien
           </div>
         </div>
 
-        <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-green-700 transition-colors truncate">{apartment.name}</h3>
+        <h3 className={`text-2xl font-bold text-gray-900 mb-3 transition-colors truncate ${
+            isOccupied 
+                ? (effectiveStatus === ApartmentStatus.Sold ? 'group-hover:text-red-600' : 'group-hover:text-blue-600') 
+                : 'group-hover:text-green-700'
+        }`}>{apartment.name}</h3>
 
         <div className="mb-6">
-            <span className={`px-4 py-1.5 text-[10px] font-semibold rounded-full uppercase tracking-widest ${getStatusClasses(apartment.status, apartment.intended_for)}`}>
-              {translateStatus(apartment.status, apartment.intended_for)}
+            <span className={`px-4 py-1.5 text-[10px] font-semibold rounded-full uppercase tracking-widest ${getStatusClasses(effectiveStatus, apartment.intended_for)}`}>
+              {translateStatus(effectiveStatus, apartment.intended_for)}
             </span>
         </div>
 
@@ -229,7 +237,7 @@ const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, project, clien
             </div>
         )}
 
-        {(apartment.status === ApartmentStatus.Rented || apartment.status === ApartmentStatus.Sold) && (
+        {isOccupied && (
             <div 
                 onClick={(e) => {
                     e.stopPropagation();

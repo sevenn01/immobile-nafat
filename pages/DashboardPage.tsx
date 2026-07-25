@@ -192,8 +192,15 @@ const DashboardPage: React.FC = () => {
     }, [contracts, payments, clients, apartments]);
 
     const availableApartments = useMemo(() => {
-        return apartments.filter(a => a.status === ApartmentStatus.Available || a.status === ApartmentStatus.ForSale);
-    }, [apartments]);
+        return apartments.filter(a => {
+            const contract = contracts.find(c => 
+                c.id === a.current_contract_id || 
+                (c.apartment_id === a.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled)
+            );
+            const isOccupied = a.status === ApartmentStatus.Rented || a.status === ApartmentStatus.Sold || !!contract;
+            return !isOccupied && (a.status === ApartmentStatus.Available || a.status === ApartmentStatus.ForSale);
+        });
+    }, [apartments, contracts]);
 
     const projectsWithAvailableCount = useMemo(() => {
         return projects.map(p => {

@@ -117,7 +117,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
             onClose();
         } catch (err: any) {
             console.error('Error reserving apartment:', err);
-            setError("Une erreur est survenue lors de l'enregistrement de la réservation.");
+            const errMsg = err?.message || "Une erreur est survenue lors de l'enregistrement de la réservation.";
+            setError(errMsg);
         } finally {
             setSubmitting(false);
         }

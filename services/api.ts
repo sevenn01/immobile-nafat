@@ -348,13 +348,19 @@ export const addContract = async (
     initialPaymentData?: Partial<Payment>
 ) => {
     if (isDemo) {
+        const aptIdx = mockDb.apartments.findIndex(a => a.id === contractData.apartment_id);
+        if (aptIdx !== -1) { 
+            const apt = mockDb.apartments[aptIdx];
+            if (apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold) {
+                throw new Error("Cette propriété est déjà réservée ou louée.");
+            }
+        }
         const newId = generateId();
         let status = contractData.type === 'sale' ? ContractStatus.SaleInProgress : ContractStatus.Active;
         if (initialPaymentData && contractData.type === 'sale' && initialPaymentData.amount_dh! >= (contractData.amount_dh || 0)) {
             status = ContractStatus.SaleCompleted;
         }
         mockDb.contracts.push({ ...contractData, id: newId, contract_id: newId, status, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), created_by: userId } as Contract);
-        const aptIdx = mockDb.apartments.findIndex(a => a.id === contractData.apartment_id);
         if (aptIdx !== -1) { 
             mockDb.apartments[aptIdx].status = contractData.type === 'rental' ? ApartmentStatus.Rented : ApartmentStatus.Sold; 
             mockDb.apartments[aptIdx].current_contract_id = newId; 
@@ -364,6 +370,18 @@ export const addContract = async (
         }
         return;
     }
+    
+    // Non-demo mode: Check apartment status first before writing to prevent double-booking
+    const aptRef = db.collection('apartments').doc(contractData.apartment_id!);
+    const aptSnap = await aptRef.get();
+    if (!aptSnap.exists) {
+        throw new Error("Propriété non trouvée.");
+    }
+    const aptData = aptSnap.data() as Apartment;
+    if (aptData.status === ApartmentStatus.Rented || aptData.status === ApartmentStatus.Sold) {
+        throw new Error("Cette propriété est déjà réservée ou louée.");
+    }
+
     try {
         const batch = db.batch();
         const contractRef = db.collection('contracts').doc();
@@ -372,7 +390,7 @@ export const addContract = async (
             status = ContractStatus.SaleCompleted;
         }
         batch.set(contractRef, { ...contractData, contract_id: contractRef.id, status, created_by: userId, updated_by: userId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-        batch.update(db.collection('apartments').doc(contractData.apartment_id!), { status: contractData.type === 'rental' ? ApartmentStatus.Rented : ApartmentStatus.Sold, current_contract_id: contractRef.id });
+        batch.update(aptRef, { status: contractData.type === 'rental' ? ApartmentStatus.Rented : ApartmentStatus.Sold, current_contract_id: contractRef.id });
         batch.update(db.collection('clients').doc(contractData.client_id!), { contracts: firebase.firestore.FieldValue.arrayUnion(contractRef.id) });
         if (initialPaymentData) {
             const payRef = db.collection('payments').doc();
@@ -406,6 +424,10 @@ export const changeContractApartment = async (contractId: string, newApartmentId
 
         const oldApt = mockDb.apartments[oldAptIdx];
         const newApt = mockDb.apartments[newAptIdx];
+
+        if (newApt.status === ApartmentStatus.Rented || newApt.status === ApartmentStatus.Sold) {
+            throw new Error("Ce nouvel appartement est déjà réservé ou loué.");
+        }
 
         // Restore old apartment status
         if (oldAptIdx !== -1) {
@@ -444,6 +466,10 @@ export const changeContractApartment = async (contractId: string, newApartmentId
     if (!newAptSnap.exists) throw new Error("Nouvel appartement non trouvé.");
     const oldApt = oldAptSnap.exists ? (oldAptSnap.data() as Apartment) : null;
     const newApt = newAptSnap.data() as Apartment;
+
+    if (newApt.status === ApartmentStatus.Rented || newApt.status === ApartmentStatus.Sold) {
+        throw new Error("Ce nouvel appartement est déjà réservé ou loué.");
+    }
 
     if (oldApt) {
         const restoredStatus = oldApt.intended_for === 'rental' ? ApartmentStatus.Available : ApartmentStatus.ForSale;
@@ -536,12 +562,25 @@ export const endContract = async (contract: Contract, userId: string) => {
         const idx = mockDb.contracts.findIndex(c => c.id === contract.id);
         if (idx !== -1) mockDb.contracts[idx].status = ContractStatus.Ended;
         const aptIdx = mockDb.apartments.findIndex(a => a.id === contract.apartment_id);
-        if (aptIdx !== -1) { mockDb.apartments[aptIdx].status = ApartmentStatus.Available; mockDb.apartments[aptIdx].current_contract_id = ""; }
+        if (aptIdx !== -1) { 
+            const apt = mockDb.apartments[aptIdx];
+            const restoredStatus = apt.intended_for === 'rental' ? ApartmentStatus.Available : ApartmentStatus.ForSale;
+            apt.status = restoredStatus; 
+            apt.current_contract_id = ""; 
+        }
         return;
     }
     const batch = db.batch();
     batch.update(db.collection('contracts').doc(contract.id), { status: ContractStatus.Ended });
-    batch.update(db.collection('apartments').doc(contract.apartment_id), { status: ApartmentStatus.Available, current_contract_id: "" });
+    
+    const aptSnap = await db.collection('apartments').doc(contract.apartment_id).get();
+    if (aptSnap.exists) {
+        const aptData = aptSnap.data() as Apartment;
+        const restoredStatus = aptData.intended_for === 'rental' ? ApartmentStatus.Available : ApartmentStatus.ForSale;
+        batch.update(db.collection('apartments').doc(contract.apartment_id), { status: restoredStatus, current_contract_id: "" });
+    } else {
+        batch.update(db.collection('apartments').doc(contract.apartment_id), { status: ApartmentStatus.Available, current_contract_id: "" });
+    }
     await batch.commit();
 };
 
@@ -573,7 +612,8 @@ export const deleteContract = async (contractId: string) => {
             const aptIdx = mockDb.apartments.findIndex(a => a.id === c.apartment_id);
             if (aptIdx !== -1) {
                 mockDb.apartments[aptIdx].current_contract_id = "";
-                mockDb.apartments[aptIdx].status = ApartmentStatus.Available;
+                const restoredStatus = mockDb.apartments[aptIdx].intended_for === 'rental' ? ApartmentStatus.Available : ApartmentStatus.ForSale;
+                mockDb.apartments[aptIdx].status = restoredStatus;
             }
         }
         mockDb.contracts = mockDb.contracts.filter(c => c.id !== contractId);
@@ -586,7 +626,14 @@ export const deleteContract = async (contractId: string) => {
     const cSnap = await db.collection("contracts").doc(contractId).get();
     if (cSnap.exists) {
         const data = cSnap.data() as Contract;
-        batch.update(db.collection("apartments").doc(data.apartment_id), { current_contract_id: "", status: ApartmentStatus.Available });
+        const aptSnap = await db.collection("apartments").doc(data.apartment_id).get();
+        if (aptSnap.exists) {
+            const aptData = aptSnap.data() as Apartment;
+            const restoredStatus = aptData.intended_for === 'rental' ? ApartmentStatus.Available : ApartmentStatus.ForSale;
+            batch.update(db.collection("apartments").doc(data.apartment_id), { current_contract_id: "", status: restoredStatus });
+        } else {
+            batch.update(db.collection("apartments").doc(data.apartment_id), { current_contract_id: "", status: ApartmentStatus.Available });
+        }
     }
     batch.delete(db.collection("contracts").doc(contractId));
     await batch.commit();

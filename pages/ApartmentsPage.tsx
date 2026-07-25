@@ -496,84 +496,87 @@ const ApartmentsPage: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {floorApts.map(apt => (
-                                            <tr 
-                                                key={apt.id} 
-                                                className={`hover:bg-gray-50/50 transition-colors group ${selectedApartmentIds.includes(apt.id) ? 'bg-green-50/30' : ''}`}
-                                            >
-                                                <td className="px-6 py-4 w-12">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        checked={selectedApartmentIds.includes(apt.id)}
-                                                        onChange={() => handleToggleSelect(apt.id)}
-                                                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 accent-green-600 cursor-pointer"
-                                                    />
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors">{apt.name}</div>
-                                                    <div className="text-[10px] text-gray-400 font-medium">{apt.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${apt.floor}`}</div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="text-sm font-medium text-gray-600">{projects.find(p => p.id === apt.project_id)?.project_name || '-'}</div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className={`px-2 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-tight w-fit ${
-                                                            (apt.status === ApartmentStatus.Available || apt.status === ApartmentStatus.ForSale)
-                                                                ? (apt.intended_for === 'sale' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700')
-                                                                : (apt.status === ApartmentStatus.Rented ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700')
-                                                        }`}>
-                                                            {apt.status === ApartmentStatus.Rented ? 'Loué' : 
-                                                             apt.intended_for === 'sale' 
-                                                                ? ((apt.status === ApartmentStatus.Available || apt.status === ApartmentStatus.ForSale) ? 'A VENDRE' : 'RESERVE')
-                                                                : ((apt.status === ApartmentStatus.Available || apt.status === ApartmentStatus.ForSale) ? 'Disponible' : 'Vendu')}
-                                                        </span>
-                                                        {(() => {
-                                                            const isOccupied = apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold;
-                                                            if (!isOccupied) return null;
-                                                            const ctr = contracts.find(c => c.id === apt.current_contract_id || (c.apartment_id === apt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
-                                                            const cl = clients.find(c => c.id === ctr?.client_id);
-                                                            if (!cl) return null;
-                                                            return (
+                                        {floorApts.map(apt => {
+                                            const contract = contracts.find(c => c.id === apt.current_contract_id || (c.apartment_id === apt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
+                                            const isOccupied = apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold || !!contract;
+                                            const effectiveStatus = isOccupied
+                                                ? (contract?.type === 'rental' || apt.intended_for === 'rental' ? ApartmentStatus.Rented : ApartmentStatus.Sold)
+                                                : apt.status;
+                                            return (
+                                                <tr 
+                                                    key={apt.id} 
+                                                    className={`hover:bg-gray-50/50 transition-colors group ${selectedApartmentIds.includes(apt.id) ? 'bg-green-50/30' : ''}`}
+                                                >
+                                                    <td className="px-6 py-4 w-12">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={selectedApartmentIds.includes(apt.id)}
+                                                            onChange={() => handleToggleSelect(apt.id)}
+                                                            className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 accent-green-600 cursor-pointer"
+                                                        />
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors">{apt.name}</div>
+                                                        <div className="text-[10px] text-gray-400 font-medium">{apt.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${apt.floor}`}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="text-sm font-medium text-gray-600">{projects.find(p => p.id === apt.project_id)?.project_name || '-'}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className={`px-2 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-tight w-fit ${
+                                                                (effectiveStatus === ApartmentStatus.Available || effectiveStatus === ApartmentStatus.ForSale)
+                                                                    ? (apt.intended_for === 'sale' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700')
+                                                                    : (effectiveStatus === ApartmentStatus.Rented ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700')
+                                                            }`}>
+                                                                {effectiveStatus === ApartmentStatus.Rented ? 'Loué' : 
+                                                                 apt.intended_for === 'sale' 
+                                                                    ? ((effectiveStatus === ApartmentStatus.Available || effectiveStatus === ApartmentStatus.ForSale) ? 'A VENDRE' : 'RESERVE')
+                                                                    : ((effectiveStatus === ApartmentStatus.Available || effectiveStatus === ApartmentStatus.ForSale) ? 'Disponible' : 'Vendu')}
+                                                            </span>
+                                                            {(() => {
+                                                                if (!isOccupied) return null;
+                                                                const cl = clients.find(c => c.id === contract?.client_id);
+                                                                if (!cl) return null;
+                                                                return (
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); setQuickInfoApt(apt); }}
+                                                                        className="flex items-center gap-1 text-[11px] font-bold text-slate-800 hover:text-green-700 transition-colors w-fit bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded"
+                                                                    >
+                                                                        <span>👤 {cl.full_name}</span>
+                                                                        <span className="text-green-600 font-extrabold text-[10px]">Info ⓘ</span>
+                                                                    </button>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500 capitalize">{apt.type === 'apartment' ? 'Logement' : 'Garage'}</td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="font-semibold text-gray-900">
+                                                            {((apt.intended_for === 'sale' ? apt.sale_price_dh : apt.price_dh) || 0).toLocaleString()} DH
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex justify-end items-center space-x-2" onClick={e => e.stopPropagation()}>
+                                                            {isOccupied ? (
                                                                 <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setQuickInfoApt(apt); }}
-                                                                    className="flex items-center gap-1 text-[11px] font-bold text-slate-800 hover:text-green-700 transition-colors w-fit bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded"
+                                                                    onClick={() => {
+                                                                        if (contract) navigate(`/clients/${contract.client_id}`);
+                                                                    }}
+                                                                    className="px-2.5 py-1 text-[10px] font-bold text-white bg-gray-900 hover:bg-black rounded-lg transition-all"
+                                                                    title="Dossier"
                                                                 >
-                                                                    <span>👤 {cl.full_name}</span>
-                                                                    <span className="text-green-600 font-extrabold text-[10px]">Info ⓘ</span>
+                                                                    Dossier
                                                                 </button>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-sm text-gray-500 capitalize">{apt.type === 'apartment' ? 'Logement' : 'Garage'}</td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="font-semibold text-gray-900">
-                                                        {((apt.intended_for === 'sale' ? apt.sale_price_dh : apt.price_dh) || 0).toLocaleString()} DH
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex justify-end items-center space-x-2" onClick={e => e.stopPropagation()}>
-                                                        {(apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold) ? (
-                                                            <button 
-                                                                onClick={() => {
-                                                                    const contract = contracts.find(c => c.id === apt.current_contract_id || (c.apartment_id === apt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
-                                                                    if (contract) navigate(`/clients/${contract.client_id}`);
-                                                                }}
-                                                                className="px-2.5 py-1 text-[10px] font-bold text-white bg-gray-900 hover:bg-black rounded-lg transition-all"
-                                                                title="Dossier"
-                                                            >
-                                                                Dossier
-                                                            </button>
-                                                        ) : (
-                                                            <button 
-                                                                onClick={() => { setReservationApt(apt); setIsReservationOpen(true); }}
-                                                                className={`px-2.5 py-1 text-[10px] font-bold text-white rounded-lg transition-all ${apt.intended_for === 'sale' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'}`}
-                                                                title="Réserver"
-                                                            >
-                                                                Réserver
-                                                            </button>
-                                                        )}
+                                                            ) : (
+                                                                <button 
+                                                                    onClick={() => { setReservationApt(apt); setIsReservationOpen(true); }}
+                                                                    className={`px-2.5 py-1 text-[10px] font-bold text-white rounded-lg transition-all ${apt.intended_for === 'sale' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'}`}
+                                                                    title="Réserver"
+                                                                >
+                                                                    Réserver
+                                                                </button>
+                                                            )}
                                                         <button 
                                                             onClick={() => setPdfApartment(apt)} 
                                                             className="p-2 text-gray-400 hover:text-green-600 transition-colors"
@@ -586,7 +589,8 @@ const ApartmentsPage: React.FC = () => {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))}
+                                             );
+                                         })}
                                     </tbody>
                                 </table>
                             </div>

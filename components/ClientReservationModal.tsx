@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getApartments, getProjects, addContract } from '../services/api';
+import { getApartments, getProjects, addContract, getContracts } from '../services/api';
 import { Client, Apartment, Contract, ContractStatus, ApartmentStatus, Project, Payment, PaymentStatus, PaymentMethod } from '../types';
 import Modal from './Modal';
 import { useAuth } from '../auth/AuthContext';
@@ -17,6 +17,7 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
     const { user } = useAuth();
     const [projects, setProjects] = useState<Project[]>([]);
     const [apartments, setApartments] = useState<Apartment[]>([]);
+    const [contracts, setContracts] = useState<Contract[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -40,9 +41,10 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
             const loadData = async () => {
                 try {
                     setLoading(true);
-                    const [projs, apts] = await Promise.all([getProjects(), getApartments()]);
+                    const [projs, apts, ctrs] = await Promise.all([getProjects(), getApartments(), getContracts()]);
                     setProjects(projs);
                     setApartments(apts);
+                    setContracts(ctrs);
                     
                     if (projs.length > 0) {
                         setSelectedProjectId(projs[0].id);
@@ -58,10 +60,18 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
     }, [isOpen]);
 
     // Filter available apartments for selected project
-    const availableApartments = apartments.filter(a => 
-        a.project_id === selectedProjectId && 
-        (a.status === ApartmentStatus.Available || a.status === ApartmentStatus.ForSale)
-    );
+    const availableApartments = apartments.filter(a => {
+        if (a.project_id !== selectedProjectId) return false;
+        
+        // Check if there is an active contract for this apartment
+        const contract = contracts.find(c => 
+            c.id === a.current_contract_id || 
+            (c.apartment_id === a.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled)
+        );
+        const isOccupied = a.status === ApartmentStatus.Rented || a.status === ApartmentStatus.Sold || !!contract;
+        
+        return !isOccupied && (a.status === ApartmentStatus.Available || a.status === ApartmentStatus.ForSale);
+    });
 
     // Sort apartments by floor, then name
     const sortedAvailableApartments = [...availableApartments].sort((a, b) => {
@@ -157,7 +167,8 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
             onClose();
         } catch (err: any) {
             console.error('Error reserving apartment from client view:', err);
-            setError("Une erreur est survenue lors de l'enregistrement de la réservation.");
+            const errMsg = err?.message || "Une erreur est survenue lors de l'enregistrement de la réservation.";
+            setError(errMsg);
         } finally {
             setSubmitting(false);
         }

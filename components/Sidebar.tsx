@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
@@ -47,16 +46,16 @@ const Sidebar: React.FC = () => {
       <div className={`flex items-center h-16 border-b border-slate-100 bg-white px-4 transition-all duration-300 ${
         isCollapsed ? 'justify-center' : 'justify-between'
       }`}>
-         {!isCollapsed && (
-           <div className="flex items-center space-x-3 overflow-hidden">
-               <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center font-bold text-white shadow-sm shrink-0">
-                   N
-               </div>
-               <h1 className="text-base font-extrabold text-slate-900 tracking-tight whitespace-nowrap animate-fade-in">
-                 Nafat Immobilier
-               </h1>
-           </div>
-         )}
+         <div className={`flex items-center transition-all duration-300 overflow-hidden whitespace-nowrap ${
+           isCollapsed ? 'opacity-0 w-0 pointer-events-none' : 'opacity-100 w-auto'
+         }`}>
+             <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center font-bold text-white shadow-sm shrink-0 mr-3">
+                 N
+             </div>
+             <h1 className="text-base font-extrabold text-slate-900 tracking-tight font-sans">
+               Nafat Immobilier
+             </h1>
+         </div>
 
          {/* Collapse / Slide Button */}
          <button 
@@ -80,7 +79,9 @@ const Sidebar: React.FC = () => {
                 className={({ isActive }) => `${commonLinkClass} ${isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'} ${isActive ? activeLinkClass : inactiveLinkClass}`}
               >
                 <DashboardIcon className="w-5 h-5 shrink-0" />
-                {!isCollapsed && <span className="ml-3 truncate">Tableau de Bord</span>}
+                <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
+                  Tableau de Bord
+                </span>
               </NavLink>
           )}
           {canView('projects') && (
@@ -90,7 +91,9 @@ const Sidebar: React.FC = () => {
                 className={({ isActive }) => `${commonLinkClass} ${isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'} ${isActive ? activeLinkClass : inactiveLinkClass}`}
               >
                 <BuildingIcon className="w-5 h-5 shrink-0" />
-                {!isCollapsed && <span className="ml-3 truncate">Projets</span>}
+                <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
+                  Projets
+                </span>
               </NavLink>
           )}
           {canView('apartments') && (
@@ -100,7 +103,9 @@ const Sidebar: React.FC = () => {
                 className={({ isActive }) => `${commonLinkClass} ${isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'} ${isActive ? activeLinkClass : inactiveLinkClass}`}
               >
                 <HomeIcon className="w-5 h-5 shrink-0" />
-                {!isCollapsed && <span className="ml-3 truncate">Propriétés</span>}
+                <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
+                  Propriétés
+                </span>
               </NavLink>
           )}
           {canView('clients') && (
@@ -110,7 +115,9 @@ const Sidebar: React.FC = () => {
                 className={({ isActive }) => `${commonLinkClass} ${isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'} ${isActive ? activeLinkClass : inactiveLinkClass}`}
               >
                 <UsersIcon className="w-5 h-5 shrink-0" />
-                {!isCollapsed && <span className="ml-3 truncate">Clients</span>}
+                <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
+                  Clients
+                </span>
               </NavLink>
           )}
           {canView('payments') && (
@@ -120,7 +127,9 @@ const Sidebar: React.FC = () => {
                 className={({ isActive }) => `${commonLinkClass} ${isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'} ${isActive ? activeLinkClass : inactiveLinkClass}`}
               >
                 <PaymentIcon className="w-5 h-5 shrink-0" />
-                {!isCollapsed && <span className="ml-3 truncate">Paiements</span>}
+                <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
+                  Paiements
+                </span>
               </NavLink>
           )}
           {canView('contracts') && (
@@ -131,7 +140,9 @@ const Sidebar: React.FC = () => {
                   className={({ isActive }) => `${commonLinkClass} ${isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'} ${isActive ? activeLinkClass : inactiveLinkClass}`}
                 >
                   <FileTextIcon className="w-5 h-5 shrink-0" />
-                  {!isCollapsed && <span className="ml-3 truncate">Réservations</span>}
+                  <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
+                    Réservations
+                  </span>
                 </NavLink>
                 <NavLink
                   to="/contrats"
@@ -139,7 +150,9 @@ const Sidebar: React.FC = () => {
                   className={({ isActive }) => `${commonLinkClass} ${isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'} ${isActive ? activeLinkClass : inactiveLinkClass}`}
                 >
                   <FileTextIcon className="w-5 h-5 shrink-0 text-emerald-400" />
-                  {!isCollapsed && <span className="ml-3 truncate">Contrats Definitifs</span>}
+                  <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
+                    Contrats Definitifs
+                  </span>
                 </NavLink>
               </>
           )}
@@ -150,7 +163,9 @@ const Sidebar: React.FC = () => {
             className={({ isActive }) => `${commonLinkClass} ${isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'} ${isActive ? 'bg-red-50 text-red-700 font-bold' : 'hover:bg-red-50 text-slate-700'}`}
           >
             <AlertTriangleIcon className="w-5 h-5 shrink-0 text-red-500" />
-            {!isCollapsed && <span className="ml-3 truncate">Désistements</span>}
+            <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
+              Désistements
+            </span>
           </NavLink>
         </nav>
         
@@ -162,7 +177,9 @@ const Sidebar: React.FC = () => {
                     className={({ isActive }) => `${commonLinkClass} ${isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'} ${isActive ? activeLinkClass : inactiveLinkClass}`}
                   >
                     <SettingsIcon className="w-5 h-5 shrink-0" />
-                    {!isCollapsed && <span className="ml-3 truncate">Paramètres</span>}
+                    <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
+                      Paramètres
+                    </span>
                   </NavLink>
              )}
         </div>

@@ -265,8 +265,8 @@ const ProjectDetailsPage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">{floorApts.map(apt => {
-                                const isOccupied = apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold;
                                 const contract = contracts.find(c => c.id === apt.current_contract_id || (c.apartment_id === apt.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled));
+                                const isOccupied = apt.status === ApartmentStatus.Rented || apt.status === ApartmentStatus.Sold || !!contract;
                                 const client = clients.find(cl => cl.id === contract?.client_id);
                                 return (
                                     <tr key={apt.id} className="hover:bg-gray-50">

@@ -268,7 +268,10 @@ const ContractsPage: React.FC = () => {
             await fetchData(); 
             closeCreationModal(); 
             setNotification({ message: "Dossier enregistré avec succès", type: 'success' });
-        } catch(e) { console.error(e); }
+        } catch(e: any) { 
+            console.error(e); 
+            setNotification({ message: e?.message || "Une erreur est survenue lors de l'enregistrement du dossier.", type: 'error' });
+        }
     };
 
     const handleCancelSubmit = async () => {
