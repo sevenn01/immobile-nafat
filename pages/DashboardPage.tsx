@@ -41,9 +41,10 @@ const DashboardPage: React.FC = () => {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [expiringContracts, setExpiringContracts] = useState<Contract[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
-    const [timePeriod, setTimePeriod] = useState<TimePeriod>('this_month');
+    const [timePeriod, setTimePeriod] = useState<TimePeriod>('all_time');
     const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7)); // YYYY-MM
     const [activeDboardProjectTab, setActiveDboardProjectTab] = useState<string>('all');
+    const [intendedForFilter, setIntendedForFilter] = useState<'all' | 'sale' | 'rental'>('all');
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
     const { user } = useAuth();
 
@@ -160,6 +161,10 @@ const DashboardPage: React.FC = () => {
             .reduce((sum, p) => sum + p.amount_dh, 0);
     }, [timeFilteredPayments, contracts]);
 
+    const globalRevenue = useMemo(() => {
+        return salesRevenue + rentalRevenue;
+    }, [salesRevenue, rentalRevenue]);
+
     const overduePaymentsInfo = useMemo<OverduePaymentInfo[]>(() => {
         const today = new Date();
         const overdue: OverduePaymentInfo[] = [];
@@ -172,11 +177,12 @@ const DashboardPage: React.FC = () => {
                 .reduce((sum, p) => sum + p.amount_dh, 0);
             if (totalPaid < expectedTotal) {
                 const client = clients.find(c => c.id === contract.client_id);
-                if (client) overdue.push({ client, contract, monthsOverdue: 1, totalOwed: expectedTotal - totalPaid });
+                const apartment = apartments.find(a => a.id === contract.apartment_id);
+                if (client) overdue.push({ client, contract, apartment, monthsOverdue: 1, totalOwed: expectedTotal - totalPaid });
             }
         });
         return overdue;
-    }, [activeContracts, payments, clients]);
+    }, [activeContracts, payments, clients, apartments]);
 
     const unsettledSalesInfo = useMemo<UnsettledSaleInfo[]>(() => {
         return contracts.filter(c => c.type === 'sale' && c.status === ContractStatus.SaleInProgress).map(contract => {
@@ -190,6 +196,10 @@ const DashboardPage: React.FC = () => {
             };
         });
     }, [contracts, payments, clients, apartments]);
+
+    const totalUnsettledSalesAmount = useMemo(() => {
+        return unsettledSalesInfo.reduce((sum, item) => sum + item.remaining, 0);
+    }, [unsettledSalesInfo]);
 
     const availableApartments = useMemo(() => {
         return apartments.filter(a => {
@@ -213,18 +223,25 @@ const DashboardPage: React.FC = () => {
     }, [projects, availableApartments]);
 
     const displayedAvailableApartments = useMemo(() => {
-        if (activeDboardProjectTab === 'all') {
-            return availableApartments;
+        let list = availableApartments;
+        if (activeDboardProjectTab !== 'all') {
+            list = list.filter(a => a.project_id === activeDboardProjectTab);
         }
-        return availableApartments.filter(a => a.project_id === activeDboardProjectTab);
-    }, [availableApartments, activeDboardProjectTab]);
+        if (intendedForFilter !== 'all') {
+            list = list.filter(a => a.intended_for === intendedForFilter);
+        }
+        return list;
+    }, [availableApartments, activeDboardProjectTab, intendedForFilter]);
 
     if (loading) return <div className="flex justify-center items-center h-64 text-gray-500 font-bold italic">Chargement du tableau de bord...</div>;
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <h2 className="text-3xl font-bold text-gray-900">Tableau de Bord</h2>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                <div>
+                    <h2 className="text-3xl font-bold text-gray-900">Tableau de Bord</h2>
+                    <p className="text-xs text-gray-500 font-medium mt-1">Vue d'ensemble commerciale & suivi prioritaire des ventes</p>
+                </div>
                 <div className="flex flex-wrap items-center gap-3">
                     {timePeriod === 'custom_month' && (
                         <input 
@@ -257,63 +274,151 @@ const DashboardPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                <StatCard title="Recettes Locatives" value={`${rentalRevenue.toLocaleString()} DH`} icon={<DollarSignIcon />} color="green" />
-                <StatCard title="Recettes Ventes" value={`${salesRevenue.toLocaleString()} DH`} icon={<DollarSignIcon />} color="purple" />
-                <StatCard title="Nouv. Locations" value={stats.rented} icon={<HomeIcon />} color="blue" />
-                <StatCard title="Nouv. Ventes" value={stats.sold} icon={<TrendingUpIcon />} color="amber" />
+            {/* Primary Global Revenue Hero Banner */}
+            <div className="bg-slate-900 rounded-2xl md:rounded-3xl p-6 md:p-8 text-white shadow-xl border border-slate-800 relative overflow-hidden">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+                    <div>
+                        <div className="flex items-center space-x-2 text-slate-300 mb-2">
+                            <CoinsIcon className="w-5 h-5 text-amber-400" />
+                            <span className="text-xs uppercase tracking-widest font-bold">Chiffre d'Affaires & Encaissements Totaux</span>
+                            <span className="text-[10px] bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full font-semibold border border-slate-700">
+                                {timePeriod === 'this_month' ? 'Ce mois' : timePeriod === 'custom_month' ? `Mois (${selectedMonth})` : 'Historique Global'}
+                            </span>
+                        </div>
+                        <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight">
+                            {globalRevenue.toLocaleString()} <span className="text-xl md:text-2xl font-bold text-amber-400">DH</span>
+                        </h1>
+                        <p className="text-xs text-slate-400 mt-1.5 font-medium">Cumul des encaissements (Ventes + Locations) sur la période sélectionnée</p>
+                    </div>
+
+                    {/* Revenue Breakdown Pills */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-800/80 p-4 rounded-2xl border border-slate-700 backdrop-blur-sm">
+                        <div className="flex items-center space-x-3.5 pr-4 border-r-0 sm:border-r border-slate-700">
+                            <div className="w-10 h-10 rounded-xl bg-slate-700/80 flex items-center justify-center border border-slate-600 text-slate-200">
+                                <TrendingUpIcon className="w-5 h-5 text-slate-200" />
+                            </div>
+                            <div>
+                                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-300 block">Recettes Ventes (Priorité)</span>
+                                <span className="text-lg font-bold text-white">{salesRevenue.toLocaleString()} <span className="text-xs text-slate-300 font-normal">DH</span></span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center space-x-3.5 pl-0 sm:pl-2">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-400/30 text-emerald-300">
+                                <HomeIcon className="w-5 h-5 text-emerald-400" />
+                            </div>
+                            <div>
+                                <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-300 block">Recettes Locatives</span>
+                                <span className="text-lg font-bold text-white">{rentalRevenue.toLocaleString()} <span className="text-xs text-emerald-300 font-normal">DH</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            {/* Stat Cards Row - Sales First Priority */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                <StatCard title="Recettes Ventes" value={`${salesRevenue.toLocaleString()} DH`} icon={<DollarSignIcon />} color="purple" />
+                <StatCard title="Nouv. Ventes" value={stats.sold} icon={<TrendingUpIcon />} color="amber" />
+                <StatCard title="Reliquats Ventes" value={`${totalUnsettledSalesAmount.toLocaleString()} DH`} icon={<CoinsIcon />} color="blue" />
+                <StatCard title="Recettes Locatives" value={`${rentalRevenue.toLocaleString()} DH`} icon={<DollarSignIcon />} color="green" />
+            </div>
+
+            {/* Priority Sections: Sales Reliquats First */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-                <DashboardSection title="Impayés Récents" icon={<AlertTriangleIcon className="text-red-500"/>}>
-                    {overduePaymentsInfo.length > 0 ? (
-                        <ul className="divide-y divide-gray-100 -mx-6 -my-6">
-                            {overduePaymentsInfo.map(({ client, contract, totalOwed }) => (
-                                <li key={`${client.id}-${contract.id}`} className="py-3 px-6 hover:bg-gray-50 flex justify-between items-center group transition-colors">
-                                    <span className="text-sm font-semibold text-gray-800 group-hover:text-green-600">{client.full_name}</span>
-                                    <span className="text-sm font-semibold text-gray-900">{totalOwed.toLocaleString()} DH</span>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : <p className="text-center text-gray-500 text-sm italic">Aucun retard à signaler.</p>}
+                <DashboardSection title="Reliquats de Vente (Encaissements à venir)" icon={<CoinsIcon className="text-indigo-500" />}>
+                     {unsettledSalesInfo.length > 0 ? (
+                        <div className="max-h-[280px] overflow-y-auto -mx-6 -my-6">
+                            <ul className="divide-y divide-gray-100">
+                                {unsettledSalesInfo.map(({ client, contract, apartment, remaining }) => (
+                                    <li key={`${client?.id || 'unknown'}-${contract.id}`} className="py-3 px-6 hover:bg-gray-50 flex justify-between items-center group transition-colors">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-semibold text-gray-800 group-hover:text-green-600 transition-colors">{client?.full_name || 'Client inconnu'}</span>
+                                            {apartment?.name && <span className="text-[10px] text-gray-400 font-medium">{apartment.name}</span>}
+                                        </div>
+                                        <span className="text-sm font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">{remaining.toLocaleString()} DH</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : <p className="text-center text-gray-500 text-sm italic py-4">Toutes les ventes sont réglées.</p>}
                 </DashboardSection>
 
-                <DashboardSection title="Reliquats de Vente" icon={<CoinsIcon className="text-indigo-500" />}>
-                     {unsettledSalesInfo.length > 0 ? (
-                        <ul className="divide-y divide-gray-100 -mx-6 -my-6">
-                            {unsettledSalesInfo.map(({ client, contract, remaining }) => (
-                                <li key={`${client?.id || 'unknown'}-${contract.id}`} className="py-3 px-6 hover:bg-gray-50 flex justify-between items-center group transition-colors">
-                                    <span className="text-sm font-semibold text-gray-800 group-hover:text-green-600">{client?.full_name}</span>
-                                    <span className="text-sm font-semibold text-gray-900">{remaining.toLocaleString()} DH</span>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : <p className="text-center text-gray-500 text-sm italic">Toutes les ventes sont réglées.</p>}
+                <DashboardSection title="Impayés Récents (Locations)" icon={<AlertTriangleIcon className="text-red-500"/>}>
+                    {overduePaymentsInfo.length > 0 ? (
+                        <div className="max-h-[280px] overflow-y-auto -mx-6 -my-6">
+                            <ul className="divide-y divide-gray-100">
+                                {overduePaymentsInfo.map(({ client, contract, apartment, totalOwed }) => (
+                                    <li key={`${client.id}-${contract.id}`} className="py-3 px-6 hover:bg-gray-50 flex justify-between items-center group transition-colors">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-semibold text-gray-800 group-hover:text-green-600 transition-colors">{client.full_name}</span>
+                                            {apartment?.name && <span className="text-[10px] text-gray-400 font-medium">{apartment.name}</span>}
+                                        </div>
+                                        <span className="text-sm font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100">{totalOwed.toLocaleString()} DH</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : <p className="text-center text-gray-500 text-sm italic py-4">Aucun retard à signaler.</p>}
                 </DashboardSection>
             </div>
 
             <div className="mt-6 md:mt-8">
-                <DashboardSection title="Appartements Disponibles par Projet" icon={<BuildingIcon className="text-green-600" />}>
-                    {/* Horizontal scrollable tab list of projects and grid/list toggler */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 border-b border-gray-150 pb-4">
-                        <div className="flex flex-wrap gap-2">
+                <DashboardSection title="Biens & Appartements Disponibles" icon={<BuildingIcon className="text-green-600" />}>
+                    {/* Horizontal scrollable tab list of projects, intendedFor filter, and grid/list toggler */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-gray-150 pb-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                            {/* Usage filter pills */}
+                            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 mr-2">
+                                <button
+                                    onClick={() => setIntendedForFilter('all')}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                        intendedForFilter === 'all'
+                                            ? 'bg-white text-slate-800 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    Tous les biens
+                                </button>
+                                <button
+                                    onClick={() => setIntendedForFilter('sale')}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                        intendedForFilter === 'sale'
+                                            ? 'bg-purple-600 text-white shadow-md shadow-purple-200'
+                                            : 'text-purple-600 hover:bg-purple-50'
+                                    }`}
+                                >
+                                    À Vendre 🏷️
+                                </button>
+                                <button
+                                    onClick={() => setIntendedForFilter('rental')}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                        intendedForFilter === 'rental'
+                                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200'
+                                            : 'text-emerald-600 hover:bg-emerald-50'
+                                    }`}
+                                >
+                                    À Louer 🔑
+                                </button>
+                            </div>
+
                             <button
                                 onClick={() => setActiveDboardProjectTab('all')}
-                                className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all ${
+                                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl border transition-all ${
                                     activeDboardProjectTab === 'all'
-                                        ? 'bg-green-600 text-white border-green-600 shadow-md shadow-green-100'
+                                        ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
                                         : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 hover:text-gray-700'
                                 }`}
                             >
-                                Tous ({availableApartments.length})
+                                Tous Projets ({availableApartments.length})
                             </button>
                             {projectsWithAvailableCount.map(p => (
                                 <button
                                     key={p.id}
                                     onClick={() => setActiveDboardProjectTab(p.id)}
-                                    className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all ${
+                                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl border transition-all ${
                                         activeDboardProjectTab === p.id
-                                            ? 'bg-green-600 text-white border-green-600 shadow-md shadow-green-100'
+                                            ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
                                             : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 hover:text-gray-700'
                                     }`}
                                 >
