@@ -222,6 +222,9 @@ const SettingsPage: React.FC = () => {
                         <PermissionCheckbox section={sectionKey} type="create" label="Ajouter" />
                         <PermissionCheckbox section={sectionKey} type="edit" label="Modifier" />
                         <PermissionCheckbox section={sectionKey} type="delete" label="Supprimer" />
+                        {sectionKey === 'contracts' && (
+                            <PermissionCheckbox section={sectionKey} type="discount" label="Accorder Remise" />
+                        )}
                     </>
                 )}
             </div>

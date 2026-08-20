@@ -4,13 +4,14 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getContracts, getClients, getApartments, addContract, cancelContract, getProjects, deleteContract, getPayments, syncContractPricesWithProperties } from '../services/api';
 import { Contract, Client, Apartment, ContractStatus, ApartmentStatus, Project, Payment, PaymentStatus, PaymentMethod } from '../types';
 import { PlusIcon, EyeIcon, EditIcon, TrashIcon, SearchIcon, XCircleIcon, FileTextIcon, HomeIcon, UsersIcon, AlertTriangleIcon, PaperclipIcon, CloseIcon, PrinterIcon } from '../components/icons/Icons';
-import { Lock } from 'lucide-react';
+import { Lock, Tag, Sparkles } from 'lucide-react';
 import Modal from '../components/Modal';
 import { useAuth } from '../auth/AuthContext';
 import ConfirmationModal from '../components/ConfirmationModal';
 import ReservationFormPage from './ReservationFormPage';
 import ReceiptPage from './ReceiptPage';
 import Notification from '../components/Notification';
+import DiscountSection from '../components/DiscountSection';
 
 // Helper to compress image before saving to Firestore (1MB limit)
 const compressImage = (base64Str: string, maxWidth = 1000, quality = 0.7): Promise<string> => {
@@ -90,6 +91,15 @@ const ContractsPage: React.FC = () => {
     const [selectedApartmentId, setSelectedApartmentId] = useState('');
     const [salePrice, setSalePrice] = useState<string>('0');
     const [amountPaid, setAmountPaid] = useState<string>('0');
+
+    // Discount state
+    const [discountData, setDiscountData] = useState({
+        isApplied: false,
+        discountDh: 0,
+        discountPercentage: 0,
+        discountReason: '',
+        finalNetPrice: 0,
+    });
     
     // Initial Payment Method Details
     const [initPaymentMethod, setInitPaymentMethod] = useState<PaymentMethod>('especes');
@@ -102,6 +112,7 @@ const ContractsPage: React.FC = () => {
     const [reservationContractId, setReservationContractId] = useState<string | null>(null);
     const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null);
     const { user } = useAuth();
+    const canDiscount = user?.role === 'admin' || user?.permissions?.contracts?.discount === true;
     
     const [searchTerm, setSearchTerm] = useState('');
     const [filters, setFilters] = useState({ 
@@ -159,7 +170,15 @@ const ContractsPage: React.FC = () => {
 
     useEffect(() => {
         const apt = apartments.find(a => a.id === selectedApartmentId);
-        setSalePrice(String(apt?.sale_price_dh || apt?.price_dh || 0));
+        const base = apt?.sale_price_dh || apt?.price_dh || 0;
+        setSalePrice(String(base));
+        setDiscountData({
+            isApplied: false,
+            discountDh: 0,
+            discountPercentage: 0,
+            discountReason: '',
+            finalNetPrice: base,
+        });
     }, [selectedApartmentId, apartments]);
 
     const filteredModalApartments = useMemo(() => {
@@ -230,7 +249,8 @@ const ContractsPage: React.FC = () => {
         const apartmentId = formData.get('apartment_id') as string;
         const selectedApt = apartments.find(a => a.id === apartmentId);
         
-        const totalAmount = Number(salePrice);
+        const basePrice = selectedApt ? (selectedApt.sale_price_dh || selectedApt.price_dh || 0) : Number(salePrice);
+        const finalAmount = discountData.isApplied ? discountData.finalNetPrice : basePrice;
         const initialDeposit = Number(amountPaid);
 
         const data: Partial<Contract> = {
@@ -238,7 +258,12 @@ const ContractsPage: React.FC = () => {
             apartment_id: apartmentId,
             project_id: selectedApt?.project_id,
             type: newContractType,
-            amount_dh: totalAmount,
+            amount_dh: finalAmount,
+            original_price_dh: basePrice,
+            discount_dh: discountData.isApplied ? discountData.discountDh : 0,
+            discount_percentage: discountData.isApplied ? discountData.discountPercentage : 0,
+            discount_reason: discountData.isApplied ? discountData.discountReason : '',
+            discount_by: discountData.isApplied ? (user.name || user.email) : '',
             start_date: formData.get('start_date') as string,
             notes: formData.get('notes') as string,
         };
@@ -250,7 +275,7 @@ const ContractsPage: React.FC = () => {
             data.end_date = end.toISOString().split('T')[0];
             data.status = ContractStatus.Active;
         } else {
-            data.status = initialDeposit >= totalAmount ? ContractStatus.SaleCompleted : ContractStatus.SaleInProgress;
+            data.status = initialDeposit >= finalAmount ? ContractStatus.SaleCompleted : ContractStatus.SaleInProgress;
             if (initialDeposit > 0) {
                 initialPay = { 
                     amount_dh: initialDeposit, 
@@ -533,11 +558,16 @@ const ContractsPage: React.FC = () => {
                                 </td>
                                 <td className="px-4 md:px-6 py-4">
                                     <div className="font-bold text-gray-900 text-sm">{c.amount_dh.toLocaleString()} <span className="text-[10px]">DH</span></div>
-                                    {isPriceMismatch && (
+                                    {c.discount_dh && c.discount_dh > 0 ? (
+                                        <div className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded mt-0.5 w-fit flex items-center gap-1">
+                                            <Tag className="w-2.5 h-2.5" />
+                                            Remise: -{c.discount_dh.toLocaleString()} DH {c.discount_percentage ? `(${c.discount_percentage}%)` : ''}
+                                        </div>
+                                    ) : (isPriceMismatch && (
                                         <div className="hidden sm:block text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded mt-0.5 w-fit">
                                             ⚠️ Prix Prop.: {propertyPrice?.toLocaleString()} DH
                                         </div>
-                                    )}
+                                    ))}
                                 </td>
                                 <td className="px-4 md:px-6 py-4">
                                     <span className={getStatusBadge(c.status).replace('px-2 py-1 text-xs', 'px-1.5 py-0.5 text-[10px] sm:text-xs')}>{translateStatus(c.status)}</span>
@@ -622,7 +652,7 @@ const ContractsPage: React.FC = () => {
                     <div>
                         <div className="flex items-center justify-between mb-1.5 ml-1">
                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                {newContractType === 'sale' ? 'Prix Net (DH)' : 'Loyer Mensuel (DH)'}
+                                {newContractType === 'sale' ? 'Prix Catalogue (DH)' : 'Loyer Mensuel (DH)'}
                             </label>
                             <span className="flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                                 <Lock className="w-3 h-3 mr-1" />
@@ -641,10 +671,17 @@ const ContractsPage: React.FC = () => {
                                 DH
                             </div>
                         </div>
-                        <p className="text-[10px] text-gray-400 mt-1 ml-1">Pour modifier le prix de ce bien, rendez-vous dans la section <strong>Propriétés</strong>.</p>
+                        <p className="text-[10px] text-gray-400 mt-1 ml-1">Pour modifier le prix de base, rendez-vous dans la section <strong>Propriétés</strong>.</p>
                     </div>
                     <div><label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Date Signature</label><input type="date" name="start_date" required defaultValue={new Date().toISOString().split('T')[0]} className={inputClasses} /></div>
                 </div>
+
+                {/* Discount Section */}
+                <DiscountSection
+                    catalogPrice={Number(salePrice) || 0}
+                    canDiscount={canDiscount}
+                    onChange={(data) => setDiscountData(data)}
+                />
 
                 <div className="p-4 sm:p-5 bg-blue-50 rounded-xl sm:rounded-2xl border border-blue-100 space-y-4">
                     <h4 className="text-[10px] font-bold text-blue-800 uppercase tracking-widest">Acompte Initial</h4>

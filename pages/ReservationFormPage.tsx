@@ -320,12 +320,29 @@ const ReservationFormPage: React.FC<ReservationFormProps> = ({ contractId, onClo
                             </div>
 
                             {/* PRICING */}
-                            <div className="pt-4 space-y-4">
-                                <div className="flex items-baseline">
-                                    <span className="min-w-[220px] italic font-medium">Au prix global et de (en DHS) :</span>
-                                    <span className="min-w-[120px] border-b border-dotted border-black pb-1 pl-2 text-lg font-bold">{formattedTotal} dh</span>
-                                    <span className="ml-4 flex-grow border-b border-dotted border-black pb-1 text-[10px] font-semibold uppercase">{numberToFrenchWords(contract.amount_dh)}</span>
-                                </div>
+                            <div className="pt-4 space-y-3">
+                                {contract.discount_dh && contract.discount_dh > 0 ? (
+                                    <>
+                                        <div className="flex items-baseline text-xs text-gray-600">
+                                            <span className="min-w-[220px] italic font-medium">Prix initial catalogue (en DHS) :</span>
+                                            <span className="min-w-[120px] border-b border-dotted border-black pb-0.5 pl-2 font-semibold">{(contract.original_price_dh || (contract.amount_dh + contract.discount_dh)).toLocaleString()} dh</span>
+                                            <span className="ml-4 flex-grow border-b border-dotted border-black pb-0.5 text-[9px] font-semibold uppercase text-gray-500">
+                                                Remise accordée : -{contract.discount_dh.toLocaleString()} dh {contract.discount_percentage ? `(${contract.discount_percentage}%)` : ''} {contract.discount_reason ? `• Motif : ${contract.discount_reason}` : ''}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-baseline">
+                                            <span className="min-w-[220px] italic font-medium">Au prix global net convenu (en DHS) :</span>
+                                            <span className="min-w-[120px] border-b border-dotted border-black pb-1 pl-2 text-lg font-bold text-emerald-900">{formattedTotal} dh</span>
+                                            <span className="ml-4 flex-grow border-b border-dotted border-black pb-1 text-[10px] font-semibold uppercase">{numberToFrenchWords(contract.amount_dh)}</span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex items-baseline">
+                                        <span className="min-w-[220px] italic font-medium">Au prix global et de (en DHS) :</span>
+                                        <span className="min-w-[120px] border-b border-dotted border-black pb-1 pl-2 text-lg font-bold">{formattedTotal} dh</span>
+                                        <span className="ml-4 flex-grow border-b border-dotted border-black pb-1 text-[10px] font-semibold uppercase">{numberToFrenchWords(contract.amount_dh)}</span>
+                                    </div>
+                                )}
                                 <div className="flex items-baseline">
                                     <span className="min-w-[300px] italic font-medium">Le reliquat, soit la somme de (en DHS) ² :</span>
                                     <span className="min-w-[120px] border-b border-dotted border-black pb-1 pl-2 text-lg font-bold">{formattedReliquat} dh</span>

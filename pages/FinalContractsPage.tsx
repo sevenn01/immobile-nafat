@@ -2,11 +2,34 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getContracts, getClients, getApartments, getProjects, getPayments, updateContract } from '../services/api';
 import { Contract, Client, Apartment, ContractStatus, Project, Payment, PaymentStatus } from '../types';
-import { Search, FileText, Printer, Eye, User, CheckCircle2, ChevronRight, AlertCircle, Sparkles, Pencil, Check, X, MessageSquare, Download } from 'lucide-react';
+import { 
+    Search, 
+    FileText, 
+    Printer, 
+    Eye, 
+    User, 
+    CheckCircle2, 
+    ChevronRight, 
+    AlertCircle, 
+    Sparkles, 
+    Pencil, 
+    Check, 
+    X, 
+    Download,
+    PlusCircle,
+    FileCheck,
+    Clock,
+    Tag,
+    Building,
+    Filter
+} from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import Modal from '../components/Modal';
+import CreateFinalContractModal from '../components/CreateFinalContractModal';
 
-const FinalContractsPage: React.FC = () => {
+type FilterTab = 'all' | 'created' | 'pending' | 'completed_paid';
+
+export const FinalContractsPage: React.FC = () => {
     const [contracts, setContracts] = useState<Contract[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [apartments, setApartments] = useState<Apartment[]>([]);
@@ -14,14 +37,21 @@ const FinalContractsPage: React.FC = () => {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
+    const [activeTab, setActiveTab] = useState<FilterTab>('all');
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // Modal state for previewing the legal contract
-    const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
-    const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+    // Modal state for previewing the printable legal contract
+    const [selectedContractForPreview, setSelectedContractForPreview] = useState<Contract | null>(null);
+    const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
-    // States for custom remarks / client notes
+    // Modal state for Creating / Editing the final contract
+    const [selectedContractForAction, setSelectedContractForAction] = useState<Contract | null>(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isEditingMode, setIsEditingMode] = useState(false);
+
+    // Inline notes edit state
     const [editingContractId, setEditingContractId] = useState<string | null>(null);
     const [editingNotesText, setEditingNotesText] = useState<string>('');
     const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -31,7 +61,6 @@ const FinalContractsPage: React.FC = () => {
         try {
             setUpdatingId(contractId);
             await updateContract(contractId, { notes: editingNotesText }, user.id);
-            // Update local state
             setContracts(prev => prev.map(c => c.id === contractId ? { ...c, notes: editingNotesText } : c));
             setEditingContractId(null);
         } catch (error) {
@@ -67,9 +96,13 @@ const FinalContractsPage: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
-    // Compute contracts that are fully paid
-    const completedContracts = useMemo(() => {
-        const saleContracts = contracts.filter(c => c.type === 'sale');
+    // All active sales/reservations across all clients
+    const reservationContracts = useMemo(() => {
+        const saleContracts = contracts.filter(c => 
+            c.type === 'sale' && 
+            c.status !== ContractStatus.Canceled && 
+            c.status !== ContractStatus.SaleCanceled
+        );
         
         return saleContracts.map(contract => {
             const client = clients.find(cl => cl.id === contract.client_id);
@@ -81,6 +114,8 @@ const FinalContractsPage: React.FC = () => {
             const totalPaid = contractPayments.reduce((sum, p) => sum + p.amount_dh, 0);
             const remaining = Math.max(0, contract.amount_dh - totalPaid);
             const isFullyPaid = remaining <= 0 || contract.status === ContractStatus.SaleCompleted;
+            const isContractCreated = Boolean(contract.final_contract_created);
+            const effectiveTitre = contract.contract_titre || apartment?.titre || '';
 
             return {
                 ...contract,
@@ -89,66 +124,111 @@ const FinalContractsPage: React.FC = () => {
                 project,
                 totalPaid,
                 remaining,
-                isFullyPaid
+                isFullyPaid,
+                isContractCreated,
+                effectiveTitre
             };
-        }).filter(item => item.isFullyPaid && item.client); // Filter to only show completed ones
+        }).filter(item => item.client && item.apartment); // Must have valid client & apartment
     }, [contracts, clients, apartments, projects, payments]);
 
-    // Apply search filter
-    const filteredCompletedContracts = useMemo(() => {
-        return completedContracts.filter(item => {
-            const clientName = item.client?.full_name || '';
-            const aptName = item.apartment?.name || '';
-            const projectName = item.project?.project_name || '';
-            const cin = item.client?.cin_number || '';
+    // Filtered by Search, Project, and Tab
+    const filteredContracts = useMemo(() => {
+        return reservationContracts.filter(item => {
+            // Project filter
+            if (selectedProjectId !== 'all' && item.project_id !== selectedProjectId) {
+                return false;
+            }
 
-            const searchLower = searchTerm.toLowerCase();
-            return clientName.toLowerCase().includes(searchLower) ||
-                   aptName.toLowerCase().includes(searchLower) ||
-                   projectName.toLowerCase().includes(searchLower) ||
-                   cin.toLowerCase().includes(searchLower);
+            // Tab filter
+            if (activeTab === 'created' && !item.isContractCreated) return false;
+            if (activeTab === 'pending' && item.isContractCreated) return false;
+            if (activeTab === 'completed_paid' && !item.isFullyPaid) return false;
+
+            // Search filter
+            if (searchTerm.trim()) {
+                const searchLower = searchTerm.toLowerCase();
+                const clientName = item.client?.full_name?.toLowerCase() || '';
+                const aptName = item.apartment?.name?.toLowerCase() || '';
+                const projectName = item.project?.project_name?.toLowerCase() || '';
+                const cin = item.client?.cin_number?.toLowerCase() || '';
+                const titre = item.effectiveTitre.toLowerCase();
+                const ref = (item.final_contract_reference || '').toLowerCase();
+
+                return clientName.includes(searchLower) ||
+                       aptName.includes(searchLower) ||
+                       projectName.includes(searchLower) ||
+                       cin.includes(searchLower) ||
+                       titre.includes(searchLower) ||
+                       ref.includes(searchLower);
+            }
+
+            return true;
         });
-    }, [completedContracts, searchTerm]);
+    }, [reservationContracts, selectedProjectId, activeTab, searchTerm]);
 
-    const projectsWithCompletedContracts = useMemo(() => {
-        const projIds = Array.from(new Set(completedContracts.map(c => c.project_id).filter(Boolean)));
+    // Counts for tabs
+    const counts = useMemo(() => {
+        return {
+            all: reservationContracts.length,
+            created: reservationContracts.filter(c => c.isContractCreated).length,
+            pending: reservationContracts.filter(c => !c.isContractCreated).length,
+            completed_paid: reservationContracts.filter(c => c.isFullyPaid).length,
+        };
+    }, [reservationContracts]);
+
+    const projectsList = useMemo(() => {
+        const projIds = Array.from(new Set(reservationContracts.map(c => c.project_id).filter(Boolean)));
         return projIds.map(id => projects.find(p => p.id === id)).filter(Boolean) as Project[];
-    }, [completedContracts, projects]);
+    }, [reservationContracts, projects]);
+
+    const handleOpenCreateModal = (contract: Contract, isEditing = false) => {
+        setSelectedContractForAction(contract);
+        setIsEditingMode(isEditing);
+        setIsCreateModalOpen(true);
+    };
+
+    const handleOpenPreviewModal = (contract: Contract) => {
+        setSelectedContractForPreview(contract);
+        setIsPreviewModalOpen(true);
+    };
 
     const handleExportProject = (projectId: string, projectName: string) => {
-        const projectContracts = completedContracts.filter(c => c.project_id === projectId);
+        const projectContracts = reservationContracts.filter(c => c.project_id === projectId);
         if (projectContracts.length === 0) return;
 
-        // Header row with UTF-8 BOM
         const headers = [
             "Client",
             "CIN",
             "Téléphone",
-            "Email",
+            "Adresse",
             "Projet",
             "Bien / Appartement",
-            "Titre de l'appartement",
-            "Prix d'achat (DH)",
-            "Montant réglé (DH)",
-            "Date de contrat",
-            "Remarques / Observations"
+            "Titre Foncier",
+            "Statut Contrat",
+            "Réf Acte",
+            "Date Acte",
+            "Prix Convenu (DH)",
+            "Montant Réglé (DH)",
+            "Reliquat (DH)",
+            "Observations"
         ];
 
-        // Map contracts to CSV rows
         const rows = projectContracts.map(item => {
             const clientName = item.client?.full_name || '';
             const cin = item.client?.cin_number || '';
             const phone = item.client?.phone || '';
-            const email = item.client?.email || '';
+            const address = item.client?.address || '';
             const projName = item.project?.project_name || '';
             const aptName = item.apartment?.name || '';
-            const aptTitle = item.apartment?.titre || 'Non renseigné';
+            const titre = item.effectiveTitre || 'Non renseigné';
+            const contractStatus = item.isContractCreated ? 'Contrat Définitif Établi' : 'En Attente';
+            const ref = item.final_contract_reference || '';
+            const contractDate = item.final_contract_date || item.start_date || '';
             const price = item.amount_dh || 0;
             const totalPaid = item.totalPaid || 0;
-            const date = item.start_date || '';
+            const remaining = item.remaining || 0;
             const notes = item.notes || '';
 
-            // Escape double quotes and wrap in double quotes
             const escapeCSV = (val: any) => {
                 const str = String(val).replace(/"/g, '""');
                 return `"${str}"`;
@@ -158,13 +238,16 @@ const FinalContractsPage: React.FC = () => {
                 escapeCSV(clientName),
                 escapeCSV(cin),
                 escapeCSV(phone),
-                escapeCSV(email),
+                escapeCSV(address),
                 escapeCSV(projName),
                 escapeCSV(aptName),
-                escapeCSV(aptTitle),
+                escapeCSV(titre),
+                escapeCSV(contractStatus),
+                escapeCSV(ref),
+                escapeCSV(contractDate),
                 price,
                 totalPaid,
-                escapeCSV(date),
+                remaining,
                 escapeCSV(notes)
             ].join(';');
         });
@@ -174,28 +257,16 @@ const FinalContractsPage: React.FC = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `Ventes_Soldees_${projectName.replace(/\s+/g, '_')}.csv`);
+        link.setAttribute("download", `Contrats_${projectName.replace(/\s+/g, '_')}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-    };
-
-    const handleExportAll = () => {
-        projectsWithCompletedContracts.forEach(proj => {
-            handleExportProject(proj.id, proj.project_name);
-        });
-    };
-
-    const handleOpenContractModal = (contract: Contract) => {
-        setSelectedContract(contract);
-        setIsContractModalOpen(true);
     };
 
     const handlePrint = () => {
         const printContent = document.getElementById('legal-contract-print-area');
         if (!printContent) return;
         
-        const originalContent = document.body.innerHTML;
         const style = document.createElement('style');
         style.innerHTML = `
             @media print {
@@ -203,7 +274,7 @@ const FinalContractsPage: React.FC = () => {
                     background: white !important;
                     color: black !important;
                     font-family: 'Times New Roman', Times, serif !important;
-                    padding: 2cm !important;
+                    padding: 1.5cm !important;
                 }
                 .no-print {
                     display: none !important;
@@ -227,47 +298,123 @@ const FinalContractsPage: React.FC = () => {
         document.head.removeChild(style);
     };
 
-    // Helper to get formatted date
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '';
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('fr-FR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-    };
+    const previewData = selectedContractForPreview 
+        ? reservationContracts.find(c => c.id === selectedContractForPreview.id) 
+        : null;
+
+    const actionData = selectedContractForAction
+        ? reservationContracts.find(c => c.id === selectedContractForAction.id)
+        : null;
 
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[400px] py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-                <p className="text-gray-500 font-medium animate-pulse">Chargement des dossiers de contrat...</p>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
+                <p className="text-gray-500 font-medium animate-pulse">Chargement des contrats et dossiers clients...</p>
             </div>
         );
     }
 
-    const modalData = selectedContract ? completedContracts.find(c => c.id === selectedContract.id) : null;
-
     return (
-        <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {/* Header */}
             <div className="md:flex md:items-center md:justify-between border-b border-gray-100 pb-5">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-3 mb-2">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">
-                            <Sparkles className="w-3.5 h-3.5 mr-1" /> Dossiers Soldés
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <Sparkles className="w-3.5 h-3.5 mr-1" /> Gestion des Actes & Contrats de Vente
                         </span>
                     </div>
                     <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
                         Contrats de Vente Définitifs
                     </h2>
                     <p className="mt-2 text-sm text-gray-500 max-w-3xl">
-                        Dossiers de réservation dont le paiement a été entièrement complété (100% encaissé). Vous pouvez maintenant générer, consulter et imprimer le contrat officiel de vente définitif incluant le titre de l'appartement.
+                        Retrouvez l'ensemble des clients ayant réservé un bien. Vous pouvez établir l'acte de vente officiel pour chaque client avec intégration automatique du titre foncier, imprimer le document légal et apporter les modifications nécessaires.
                     </p>
                 </div>
             </div>
 
-            {/* Search filter */}
+            {/* Filter Tabs & Project Selection */}
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+                {/* Tabs */}
+                <div className="flex flex-wrap gap-2 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/80">
+                    <button
+                        onClick={() => setActiveTab('all')}
+                        className={`inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            activeTab === 'all'
+                                ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
+                                : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        <span>Tous les Dossiers Réservés</span>
+                        <span className="ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-slate-100 text-slate-700">
+                            {counts.all}
+                        </span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveTab('created')}
+                        className={`inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            activeTab === 'created'
+                                ? 'bg-white text-emerald-800 shadow-xs border border-emerald-200'
+                                : 'text-slate-600 hover:text-emerald-700'
+                        }`}
+                    >
+                        <FileCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+                        <span>Contrats Établis</span>
+                        <span className="ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
+                            {counts.created}
+                        </span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveTab('pending')}
+                        className={`inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            activeTab === 'pending'
+                                ? 'bg-white text-amber-900 shadow-xs border border-amber-200'
+                                : 'text-slate-600 hover:text-amber-700'
+                        }`}
+                    >
+                        <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
+                        <span>En Attente de Création</span>
+                        <span className="ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-100 text-amber-800">
+                            {counts.pending}
+                        </span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveTab('completed_paid')}
+                        className={`inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            activeTab === 'completed_paid'
+                                ? 'bg-white text-indigo-800 shadow-xs border border-indigo-200'
+                                : 'text-slate-600 hover:text-indigo-700'
+                        }`}
+                    >
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                        <span>100% Soldés</span>
+                        <span className="ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-indigo-100 text-indigo-800">
+                            {counts.completed_paid}
+                        </span>
+                    </button>
+                </div>
+
+                {/* Project Filter Selector */}
+                <div className="flex items-center gap-2 w-full lg:w-auto">
+                    <Building className="w-4 h-4 text-slate-400 shrink-0" />
+                    <select
+                        value={selectedProjectId}
+                        onChange={(e) => setSelectedProjectId(e.target.value)}
+                        className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-2xs w-full sm:w-auto"
+                    >
+                        <option value="all">Tous les Projets ({projectsList.length})</option>
+                        {projectsList.map(p => (
+                            <option key={p.id} value={p.id}>{p.project_name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Search & Action Bar */}
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
                 <div className="relative flex-1 w-full">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -277,47 +424,39 @@ const FinalContractsPage: React.FC = () => {
                         type="text"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Rechercher par client, projet, appartement, CIN..."
-                        className="block w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 text-sm placeholder-gray-400 font-medium bg-gray-50/50"
+                        placeholder="Rechercher par client, CIN, appartement, titre foncier, projet..."
+                        className="block w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-sm placeholder-gray-400 font-medium bg-gray-50/50"
                     />
                 </div>
-                <div className="text-sm font-semibold text-gray-500 self-center">
-                    {filteredCompletedContracts.length} dossier(s) trouvé(s)
+                <div className="text-sm font-semibold text-gray-500 self-center whitespace-nowrap">
+                    {filteredContracts.length} dossier(s) affiché(s)
                 </div>
             </div>
 
             {/* Export Section separated by project */}
-            {projectsWithCompletedContracts.length > 0 && (
-                <div className="bg-gradient-to-r from-indigo-50 to-indigo-100/40 border border-indigo-150 p-5 rounded-2xl shadow-sm space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            {projectsList.length > 0 && (
+                <div className="bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-slate-50 border border-emerald-150 p-4 rounded-2xl shadow-sm space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center space-x-2">
-                            <FileText className="w-5 h-5 text-indigo-600" />
-                            <h3 className="text-sm font-bold text-gray-800">Extraire les rapports clients soldés par Projet</h3>
+                            <FileText className="w-4 h-4 text-emerald-700" />
+                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                Extraire les dossiers de contrats par projet
+                            </h3>
                         </div>
-                        <button
-                            onClick={handleExportAll}
-                            className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow transition-all space-x-1.5 cursor-pointer"
-                        >
-                            <Download className="w-4 h-4" />
-                            <span>Exporter Tous (Fichiers séparés par Projet)</span>
-                        </button>
                     </div>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                        Téléchargez les listes des clients ayant entièrement soldé leurs paiements. Les fichiers d'extraction sont générés séparément par projet au format CSV (encodage UTF-8 avec BOM, séparateur point-virgule) pour une compatibilité parfaite avec Excel.
-                    </p>
-                    <div className="flex flex-wrap gap-2.5 pt-1">
-                        {projectsWithCompletedContracts.map(proj => {
-                            const count = completedContracts.filter(c => c.project_id === proj.id).length;
+                    <div className="flex flex-wrap gap-2">
+                        {projectsList.map(proj => {
+                            const count = reservationContracts.filter(c => c.project_id === proj.id).length;
                             return (
                                 <button
                                     key={proj.id}
                                     onClick={() => handleExportProject(proj.id, proj.project_name)}
-                                    className="inline-flex items-center px-3.5 py-2 bg-white hover:bg-indigo-50/50 border border-gray-200 hover:border-indigo-200 text-xs font-semibold text-gray-700 rounded-xl transition-all shadow-sm hover:shadow space-x-2 cursor-pointer group"
+                                    className="inline-flex items-center px-3 py-1.5 bg-white hover:bg-emerald-50/60 border border-gray-200 hover:border-emerald-200 text-xs font-semibold text-gray-700 rounded-xl transition-all shadow-2xs space-x-2 cursor-pointer group"
                                 >
-                                    <span className="w-2 h-2 rounded-full bg-green-500 group-hover:scale-110 transition-transform"></span>
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 group-hover:scale-110 transition-transform"></span>
                                     <span className="font-bold">{proj.project_name}</span>
-                                    <span className="bg-indigo-50 text-indigo-700 text-[10px] px-1.5 py-0.5 rounded font-bold">{count} soldé(s)</span>
-                                    <Download className="w-3.5 h-3.5 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+                                    <span className="bg-emerald-50 text-emerald-800 text-[10px] px-1.5 py-0.2 rounded font-bold">{count} dossier(s)</span>
+                                    <Download className="w-3.5 h-3.5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
                                 </button>
                             );
                         })}
@@ -325,133 +464,232 @@ const FinalContractsPage: React.FC = () => {
                 </div>
             )}
 
-            {/* List Table */}
-            {filteredCompletedContracts.length > 0 ? (
+            {/* Main Table */}
+            {filteredContracts.length > 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+                            <thead className="bg-gray-50/80">
                                 <tr>
-                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Client & CIN</th>
-                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Bien & Projet</th>
-                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Titre de l'appartement</th>
-                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Prix & Réglé</th>
-                                    <th scope="col" className="px-6 py-3.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Statut Paiement</th>
-                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Remarques / Observations</th>
-                                    <th scope="col" className="px-6 py-3.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                        Client & CIN
+                                    </th>
+                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                        Bien & Projet
+                                    </th>
+                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                        Titre Foncier
+                                    </th>
+                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                        Prix & Règlements
+                                    </th>
+                                    <th scope="col" className="px-6 py-3.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                        Statut de l'Acte
+                                    </th>
+                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                        Remarques
+                                    </th>
+                                    <th scope="col" className="px-6 py-3.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredCompletedContracts.map((item) => (
-                                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center space-x-3">
-                                                <div className="p-2 bg-indigo-50 rounded-lg">
-                                                    <User className="w-5 h-5 text-indigo-600" />
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm font-bold text-gray-900">{item.client?.full_name}</div>
-                                                    <div className="text-xs text-gray-500 font-medium">CIN: {item.client?.cin_number}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div>
-                                                <div className="text-sm font-bold text-gray-900">{item.apartment?.name}</div>
-                                                <div className="text-xs text-gray-500 font-medium">Projet: {item.project?.project_name}</div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            {item.apartment?.titre ? (
-                                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-100">
-                                                    {item.apartment.titre}
-                                                </span>
-                                            ) : (
-                                                <div className="space-y-1">
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
-                                                        Non renseigné
-                                                    </span>
-                                                    <div className="text-[10px] text-gray-400">Modifier dans Propriétés</div>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                                            <div className="text-sm font-bold text-gray-900">{item.amount_dh.toLocaleString()} DH</div>
-                                            <div className="text-xs text-green-600 font-bold">Soldé (100%)</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 uppercase tracking-wider">
-                                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> PAYÉ & VALIDÉ
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {editingContractId === item.id ? (
-                                                <div className="flex items-center space-x-2">
-                                                    <input
-                                                        type="text"
-                                                        value={editingNotesText}
-                                                        onChange={(e) => setEditingNotesText(e.target.value)}
-                                                        className="block w-full min-w-[150px] px-2 py-1 text-xs border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-sans"
-                                                        placeholder="Ex: Titre foncier remis, Dossier archivé..."
-                                                        autoFocus
-                                                    />
-                                                    <button
-                                                        onClick={() => handleSaveNotes(item.id)}
-                                                        disabled={updatingId === item.id}
-                                                        className="p-1 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                        title="Enregistrer"
-                                                    >
-                                                        {updatingId === item.id ? (
-                                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-                                                        ) : (
-                                                            <Check className="w-4 h-4" />
+                                {filteredContracts.map((item) => {
+                                    const percent = item.amount_dh > 0 ? Math.min(100, Math.round((item.totalPaid / item.amount_dh) * 100)) : 0;
+                                    return (
+                                        <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                                            {/* Client */}
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="p-2 bg-emerald-50 rounded-xl text-emerald-700">
+                                                        <User className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-bold text-gray-900">{item.client?.full_name}</div>
+                                                        <div className="text-xs text-gray-500 font-medium">CIN: {item.client?.cin_number}</div>
+                                                        {item.client?.phone && (
+                                                            <div className="text-[11px] text-gray-400">{item.client.phone}</div>
                                                         )}
-                                                    </button>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {/* Apartment & Project */}
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div>
+                                                    <div className="text-sm font-bold text-gray-900">{item.apartment?.name}</div>
+                                                    <div className="text-xs text-emerald-700 font-semibold">{item.project?.project_name}</div>
+                                                    <div className="text-[11px] text-gray-400">
+                                                        {item.apartment?.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${item.apartment?.floor}`} • {item.apartment?.surface_m2} m²
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {/* Titre Foncier */}
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                {item.effectiveTitre ? (
+                                                    <div className="space-y-1">
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                                                            <Tag className="w-3 h-3 mr-1 text-amber-600" />
+                                                            {item.effectiveTitre}
+                                                        </span>
+                                                        <div className="text-[10px] text-emerald-600 font-medium">Titre associé</div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-1">
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                                                            Non renseigné
+                                                        </span>
+                                                        <div className="text-[10px] text-amber-600 font-medium">À définir lors de l'acte</div>
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            {/* Price & Payments */}
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="space-y-1">
+                                                    <div className="text-sm font-bold text-gray-900">
+                                                        {item.amount_dh.toLocaleString()} DH
+                                                        {item.discount_dh && item.discount_dh > 0 ? (
+                                                            <span className="ml-1 text-[10px] font-bold text-amber-600">(-{item.discount_dh.toLocaleString()} DH)</span>
+                                                        ) : null}
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <div className="w-20 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                                            <div 
+                                                                className={`h-full rounded-full ${item.isFullyPaid ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                                                                style={{ width: `${percent}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-gray-500">{percent}%</span>
+                                                    </div>
+                                                    <div className="text-[10px] text-gray-400">
+                                                        Payé: <strong className="text-emerald-700">{item.totalPaid.toLocaleString()} DH</strong>
+                                                        {item.remaining > 0 && (
+                                                            <span> • Reste: <strong className="text-amber-600">{item.remaining.toLocaleString()} DH</strong></span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {/* Contract Status */}
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                {item.isContractCreated ? (
+                                                    <div className="inline-flex flex-col items-center space-y-0.5">
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                            <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" /> ACTE ÉTABLI
+                                                        </span>
+                                                        {item.final_contract_date && (
+                                                            <span className="text-[10px] text-gray-400">
+                                                                {new Date(item.final_contract_date).toLocaleDateString('fr-FR')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="inline-flex flex-col items-center space-y-0.5">
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                                            <Clock className="w-3.5 h-3.5 mr-1 text-amber-500" /> EN ATTENTE
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-400">Réservation active</span>
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            {/* Notes */}
+                                            <td className="px-6 py-4">
+                                                {editingContractId === item.id ? (
+                                                    <div className="flex items-center space-x-1.5 min-w-[150px]">
+                                                        <input
+                                                            type="text"
+                                                            value={editingNotesText}
+                                                            onChange={(e) => setEditingNotesText(e.target.value)}
+                                                            className="block w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                                                            placeholder="Observations..."
+                                                            autoFocus
+                                                        />
+                                                        <button
+                                                            onClick={() => handleSaveNotes(item.id)}
+                                                            disabled={updatingId === item.id}
+                                                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                                                            title="Enregistrer"
+                                                        >
+                                                            {updatingId === item.id ? (
+                                                                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-emerald-600" />
+                                                            ) : (
+                                                                <Check className="w-3.5 h-3.5" />
+                                                            )}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditingContractId(null)}
+                                                            className="p-1 text-red-500 hover:bg-red-50 rounded-lg"
+                                                            title="Annuler"
+                                                        >
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center space-x-2 group max-w-[180px]">
+                                                        <span className="text-xs text-gray-600 truncate font-medium block">
+                                                            {item.notes || <span className="text-gray-400 italic font-normal">Aucune</span>}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingContractId(item.id);
+                                                                setEditingNotesText(item.notes || '');
+                                                            }}
+                                                            className="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                            title="Modifier"
+                                                        >
+                                                            <Pencil className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            {/* Actions */}
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                                <div className="flex items-center justify-center space-x-2">
+                                                    {item.isContractCreated ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleOpenPreviewModal(item)}
+                                                                className="inline-flex items-center px-3 py-1.5 border border-emerald-200 rounded-xl shadow-2xs text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                                                title="Voir l'acte de vente officiel"
+                                                            >
+                                                                <FileText className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                                                                <span>Voir l'Acte</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleOpenCreateModal(item, true)}
+                                                                className="inline-flex items-center p-1.5 border border-slate-200 rounded-xl text-slate-600 hover:text-emerald-700 hover:bg-slate-100 transition-colors"
+                                                                title="Modifier les données de l'acte (titre, date, notaire...)"
+                                                            >
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleOpenCreateModal(item, false)}
+                                                            className="inline-flex items-center px-3.5 py-1.5 rounded-xl shadow-xs text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all hover:shadow space-x-1"
+                                                        >
+                                                            <PlusCircle className="w-3.5 h-3.5" />
+                                                            <span>Créer le Contrat</span>
+                                                        </button>
+                                                    )}
+
                                                     <button
-                                                        onClick={() => setEditingContractId(null)}
-                                                        className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                        title="Annuler"
+                                                        onClick={() => navigate(`/clients/${item.client_id}`)}
+                                                        className="inline-flex items-center p-1.5 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+                                                        title="Consulter la fiche client"
                                                     >
-                                                        <X className="w-4 h-4" />
+                                                        <Eye className="w-3.5 h-3.5" />
                                                     </button>
                                                 </div>
-                                            ) : (
-                                                <div className="flex items-center space-x-2 group max-w-[200px]">
-                                                    <span className="text-xs text-gray-600 truncate font-medium max-w-[150px] block">
-                                                        {item.notes || <span className="text-gray-400 italic font-normal">Aucune remarque</span>}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditingContractId(item.id);
-                                                            setEditingNotesText(item.notes || '');
-                                                        }}
-                                                        className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
-                                                        title="Modifier la remarque"
-                                                    >
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                            <div className="flex items-center justify-center space-x-3">
-                                                <button
-                                                    onClick={() => handleOpenContractModal(item)}
-                                                    className="inline-flex items-center px-3.5 py-1.5 border border-indigo-200 rounded-xl shadow-sm text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
-                                                >
-                                                    <FileText className="w-3.5 h-3.5 mr-1.5" /> Acte de Vente
-                                                </button>
-                                                <button
-                                                    onClick={() => navigate(`/clients/${item.client_id}`)}
-                                                    className="inline-flex items-center px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                                                    title="Fiche Client"
-                                                >
-                                                    <Eye className="w-3.5 h-3.5 mr-1" /> Dossier
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -461,57 +699,114 @@ const FinalContractsPage: React.FC = () => {
                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-100">
                         <AlertCircle className="w-8 h-8 text-gray-400" />
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">Aucun dossier soldé trouvé</h3>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">Aucun dossier trouvé</h3>
                     <p className="text-gray-500 text-sm leading-relaxed mb-6">
-                        Les dossiers de contrats définitifs s'affichent automatiquement ici une fois que le client a complété la totalité du paiement de sa réservation (avance + reliquat égal au montant total).
+                        {searchTerm 
+                            ? "Aucun résultat ne correspond à vos critères de recherche. Essayez avec un autre mot-clé."
+                            : "Tous les clients ayant réservé un bien immobilier apparaîtront ici pour vous permettre d'établir leurs contrats de vente définitifs."}
                     </p>
-                    <Link
-                        to="/reservations"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
-                    >
-                        Consulter les Réservations <ChevronRight className="w-4 h-4 ml-1" />
-                    </Link>
+                    {searchTerm ? (
+                        <button
+                            onClick={() => setSearchTerm('')}
+                            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-bold rounded-xl text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            Effacer la recherche
+                        </button>
+                    ) : (
+                        <Link
+                            to="/reservations"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-md text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                        >
+                            Consulter les Réservations <ChevronRight className="w-4 h-4 ml-1" />
+                        </Link>
+                    )}
                 </div>
             )}
 
-            {/* Legal Contract Modal Preview */}
+            {/* Create / Edit Final Contract Modal */}
+            {isCreateModalOpen && actionData && (
+                <CreateFinalContractModal
+                    isOpen={isCreateModalOpen}
+                    onClose={() => {
+                        setIsCreateModalOpen(false);
+                        setSelectedContractForAction(null);
+                    }}
+                    contract={actionData}
+                    client={actionData.client}
+                    apartment={actionData.apartment}
+                    project={actionData.project}
+                    payments={payments}
+                    isEditing={isEditingMode}
+                    onSuccess={() => {
+                        fetchData();
+                    }}
+                />
+            )}
+
+            {/* Legal Contract Preview Modal (Printable) */}
             <Modal
-                title="Aperçu de l'Acte de Vente Définitif"
-                isOpen={isContractModalOpen}
-                onClose={() => setIsContractModalOpen(false)}
+                title="Acte de Vente Définitif"
+                isOpen={isPreviewModalOpen}
+                onClose={() => {
+                    setIsPreviewModalOpen(false);
+                    setSelectedContractForPreview(null);
+                }}
             >
-                {modalData && (
+                {previewData && (
                     <div className="space-y-6">
-                        <div className="flex justify-end space-x-3 border-b border-gray-100 pb-4 no-print">
-                            <button
-                                onClick={handlePrint}
-                                className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-green-600 hover:bg-green-700 transition-colors"
-                            >
-                                <Printer className="w-4 h-4 mr-1.5" /> Imprimer l'Acte
-                            </button>
-                            <button
-                                onClick={() => setIsContractModalOpen(false)}
-                                className="px-4 py-2 border border-gray-300 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                Fermer
-                            </button>
+                        {/* Header toolbar */}
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-4 no-print flex-wrap gap-2">
+                            <div className="flex items-center space-x-2">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                                    {previewData.final_contract_reference || `ACTE-${previewData.apartment?.name}`}
+                                </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={() => {
+                                        setIsPreviewModalOpen(false);
+                                        handleOpenCreateModal(previewData, true);
+                                    }}
+                                    className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                                >
+                                    <Pencil className="w-3.5 h-3.5 mr-1.5 text-gray-500" /> Modifier l'Acte
+                                </button>
+                                <button
+                                    onClick={handlePrint}
+                                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-md text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                                >
+                                    <Printer className="w-4 h-4 mr-1.5" /> Imprimer l'Acte
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Print Layout */}
+                        {/* Printable Document Area */}
                         <div 
                             id="legal-contract-print-area" 
                             className="print-card bg-slate-50 border border-gray-200 rounded-2xl p-8 max-h-[600px] overflow-y-auto font-serif text-gray-800 text-sm leading-relaxed shadow-inner"
                         >
                             {/* Document Header */}
                             <div className="text-center space-y-2 mb-8">
-                                <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">ACTE DE VENTE DÉFINITIF</h2>
-                                <p className="text-xs italic text-gray-500">Sous seing privé fait en double exemplaire</p>
+                                <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
+                                    ACTE DE VENTE DÉFINITIF
+                                </h2>
+                                <p className="text-xs italic text-gray-500">
+                                    {previewData.notary_name ? `Rédigé sous la forme : ${previewData.notary_name}` : 'Fait sous seing privé en double exemplaire'}
+                                </p>
+                                {previewData.final_contract_reference && (
+                                    <p className="text-[11px] font-mono font-bold text-gray-700">
+                                        Réf : {previewData.final_contract_reference}
+                                    </p>
+                                )}
                                 <div className="w-32 h-1 bg-gray-900 mx-auto mt-2"></div>
                             </div>
 
                             {/* Section: Parties */}
                             <div className="space-y-4 mb-6">
-                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">ENTRE LES SOUSSIGNÉS :</h3>
+                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">
+                                    ENTRE LES SOUSSIGNÉS :
+                                </h3>
                                 <div className="pl-4">
                                     <p className="font-bold text-gray-900">1. La société NAFAT IMMOBILIER S.A.R.L</p>
                                     <p className="text-xs text-gray-600 pl-4">
@@ -520,10 +815,11 @@ const FinalContractsPage: React.FC = () => {
                                     </p>
                                 </div>
                                 <div className="pl-4">
-                                    <p className="font-bold text-gray-900">2. M. / Mme. {modalData.client?.full_name}</p>
+                                    <p className="font-bold text-gray-900">2. M. / Mme. {previewData.client?.full_name}</p>
                                     <p className="text-xs text-gray-600 pl-4">
-                                        Titulaire du CIN / Passeport n° <strong>{modalData.client?.cin_number}</strong>, 
-                                        demeurant à l'adresse suivante : {modalData.client?.address || 'Non renseignée'}, 
+                                        Titulaire du CIN / Passeport n° <strong>{previewData.client?.cin_number}</strong>, 
+                                        demeurant à l'adresse suivante : {previewData.client?.address || 'Non renseignée'}, 
+                                        téléphone : {previewData.client?.phone || 'Non renseigné'}, 
                                         ci-après dénommé(e) l'<strong>"ACQUÉREUR"</strong>.
                                     </p>
                                 </div>
@@ -531,41 +827,66 @@ const FinalContractsPage: React.FC = () => {
 
                             {/* Section: Objet */}
                             <div className="space-y-4 mb-6">
-                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">OBJET DE LA VENTE :</h3>
+                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">
+                                    OBJET DE LA VENTE :
+                                </h3>
                                 <p className="text-xs">
                                     Le VENDEUR vend et cède en toute propriété, sous les garanties ordinaires de droit et de fait, à l'ACQUÉREUR, qui accepte, le bien immobilier désigné ci-après :
                                 </p>
                                 <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2 text-xs">
                                     <div className="grid grid-cols-2 gap-2">
-                                        <div><span className="text-gray-500 font-medium">Projet :</span> <strong className="text-gray-900">{modalData.project?.project_name}</strong></div>
-                                        <div><span className="text-gray-500 font-medium">Type :</span> <strong className="text-gray-900 uppercase">{modalData.apartment?.type === 'garage' ? 'Garage' : 'Appartement'}</strong></div>
-                                        <div><span className="text-gray-500 font-medium">Désignation :</span> <strong className="text-gray-900">{modalData.apartment?.name}</strong></div>
-                                        <div><span className="text-gray-500 font-medium font-serif">Étage :</span> <strong className="text-gray-900">{modalData.apartment?.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${modalData.apartment?.floor}`}</strong></div>
-                                        <div><span className="text-gray-500 font-medium">Surface habitable :</span> <strong className="text-gray-900">{modalData.apartment?.surface_m2} m²</strong></div>
-                                        <div><span className="text-gray-500 font-medium">TITRE FONCIER :</span> <strong className="text-indigo-700">{modalData.apartment?.titre || 'En cours de morcellement (Morcellement Général du titre foncier mère)'}</strong></div>
+                                        <div><span className="text-gray-500 font-medium">Projet :</span> <strong className="text-gray-900">{previewData.project?.project_name}</strong></div>
+                                        <div><span className="text-gray-500 font-medium">Type :</span> <strong className="text-gray-900 uppercase">{previewData.apartment?.type === 'garage' ? 'Garage' : 'Appartement'}</strong></div>
+                                        <div><span className="text-gray-500 font-medium">Désignation :</span> <strong className="text-gray-900">{previewData.apartment?.name}</strong></div>
+                                        <div><span className="text-gray-500 font-medium">Étage :</span> <strong className="text-gray-900">{previewData.apartment?.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${previewData.apartment?.floor}`}</strong></div>
+                                        <div><span className="text-gray-500 font-medium">Surface habitable :</span> <strong className="text-gray-900">{previewData.apartment?.surface_m2} m²</strong></div>
+                                        <div>
+                                            <span className="text-gray-500 font-medium">TITRE FONCIER :</span>{' '}
+                                            <strong className="text-emerald-800 font-bold">
+                                                {previewData.effectiveTitre || 'En cours d\'immatriculation / Morcellement'}
+                                            </strong>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Section: Prix */}
                             <div className="space-y-4 mb-6">
-                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">PRIX DE VENTE & QUITTANCE :</h3>
+                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">
+                                    PRIX DE VENTE & MODALITÉS :
+                                </h3>
                                 <p className="text-xs">
-                                    La présente vente est consentie et acceptée moyennant le prix principal de <strong>{modalData.amount_dh.toLocaleString()} DH</strong> (Dirhams Marocains).
+                                    La présente vente est consentie et acceptée moyennant le prix net de <strong>{previewData.amount_dh.toLocaleString()} DH</strong> (Dirhams Marocains).
+                                    {previewData.discount_dh && previewData.discount_dh > 0 ? (
+                                        <span className="text-gray-600 block mt-1 italic">
+                                            (Après application d'une remise commerciale de {previewData.discount_dh.toLocaleString()} DH sur le prix initial de {(previewData.original_price_dh || (previewData.amount_dh + previewData.discount_dh)).toLocaleString()} DH).
+                                        </span>
+                                    ) : null}
                                 </p>
-                                <p className="text-xs bg-green-50 border border-green-200 rounded-xl p-4 text-green-900 italic">
-                                    "Le VENDEUR reconnaît expressément et définitivement par les présentes avoir reçu de l'ACQUÉREUR la somme totale de {modalData.amount_dh.toLocaleString()} DH sous forme de versements successifs. Le VENDEUR en donne quittance entière, définitive et sans réserve à l'ACQUÉREUR."
-                                </p>
+                                {previewData.isFullyPaid ? (
+                                    <p className="text-xs bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-900 italic">
+                                        "Le VENDEUR reconnaît expressément et définitivement par les présentes avoir reçu de l'ACQUÉREUR la totalité de la somme de {previewData.amount_dh.toLocaleString()} DH sous forme de versements successifs dument enregistrés. Le VENDEUR en donne quittance entière, définitive et sans réserve à l'ACQUÉREUR."
+                                    </p>
+                                ) : (
+                                    <p className="text-xs bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-900 italic">
+                                        "L'ACQUÉREUR a réglé à ce jour la somme de {previewData.totalPaid.toLocaleString()} DH. Le solde restant dû s'élève à la somme de {previewData.remaining.toLocaleString()} DH, payable selon l'échéancier convenu."
+                                    </p>
+                                )}
                             </div>
 
                             {/* Section: Clauses standards */}
                             <div className="space-y-4 mb-8">
-                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">DISPOSITIONS ET JOUISSANCE :</h3>
-                                <ul className="list-disc pl-5 text-xs space-y-1.5 text-gray-600">
-                                    <li>L'ACQUÉREUR sera propriétaire du bien immobilier à compter du jour de la signature des présentes et en aura la jouissance immédiate.</li>
-                                    <li>Le VENDEUR déclare que le bien vendu est libre de toute dette, hypothèque ou charge quelconque, à l'exception de la copropriété ordinaire.</li>
-                                    <li>Chacune des parties s'engage à effectuer l'ensemble des formalités d'enregistrement et d'inscription foncière nécessaires auprès des administrations compétentes ou par voie de notaire.</li>
-                                </ul>
+                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">
+                                    DISPOSITIONS ET JOUISSANCE :
+                                </h3>
+                                <p className="text-xs text-gray-700">
+                                    {previewData.final_contract_clauses || "L'ACQUÉREUR sera propriétaire du bien immobilier à compter du jour de la signature des présentes et en aura la jouissance immédiate. Le VENDEUR déclare que le bien vendu est libre de toute dette ou hypothèque."}
+                                </p>
+                            </div>
+
+                            {/* Date of the contract */}
+                            <div className="text-right text-xs italic text-gray-700 mb-6">
+                                Fait à Tétouan, le {previewData.final_contract_date ? new Date(previewData.final_contract_date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
                             </div>
 
                             {/* Section: Signatures */}

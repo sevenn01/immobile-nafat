@@ -4,6 +4,7 @@ import { Contract, Apartment } from '../types';
 import Modal from './Modal';
 import { useAuth } from '../auth/AuthContext';
 import { Lock } from 'lucide-react';
+import DiscountSection from './DiscountSection';
 
 interface EditContractModalProps {
     isOpen: boolean;
@@ -16,6 +17,8 @@ const inputClasses = "w-full px-4 py-2.5 bg-gray-50 border border-gray-200 round
 
 export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, onClose, contract, onSuccess }) => {
     const { user } = useAuth();
+    const canDiscount = user?.role === 'admin' || user?.permissions?.contracts?.discount === true;
+
     const [amountDh, setAmountDh] = useState<string>('0');
     const [propertyCatalogPrice, setPropertyCatalogPrice] = useState<number | null>(null);
     const [startDate, setStartDate] = useState<string>('');
@@ -24,6 +27,15 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, on
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Discount state
+    const [discountData, setDiscountData] = useState({
+        isApplied: false,
+        discountDh: 0,
+        discountPercentage: 0,
+        discountReason: '',
+        finalNetPrice: 0,
+    });
+
     useEffect(() => {
         if (contract && isOpen) {
             setAmountDh(String(contract.amount_dh));
@@ -31,6 +43,17 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, on
             setDurationMonths(String(contract.duration_months || 12));
             setNotes(contract.notes || '');
             setError(null);
+
+            const hasExistingDiscount = Boolean(contract.discount_dh && contract.discount_dh > 0);
+            const basePrice = contract.original_price_dh || (contract.amount_dh + (contract.discount_dh || 0));
+
+            setDiscountData({
+                isApplied: hasExistingDiscount,
+                discountDh: contract.discount_dh || 0,
+                discountPercentage: contract.discount_percentage || 0,
+                discountReason: contract.discount_reason || '',
+                finalNetPrice: contract.amount_dh,
+            });
 
             // Fetch property catalog price
             const fetchApt = async () => {
@@ -51,6 +74,8 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, on
 
     if (!contract) return null;
 
+    const basePrice = propertyCatalogPrice !== null ? propertyCatalogPrice : (contract.original_price_dh || contract.amount_dh + (contract.discount_dh || 0));
+
     const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!user) {
@@ -58,8 +83,15 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, on
             return;
         }
 
+        const finalAmount = discountData.isApplied ? discountData.finalNetPrice : basePrice;
+
         const data: Partial<Contract> = {
-            amount_dh: Number(amountDh),
+            amount_dh: finalAmount,
+            original_price_dh: basePrice,
+            discount_dh: discountData.isApplied ? discountData.discountDh : 0,
+            discount_percentage: discountData.isApplied ? discountData.discountPercentage : 0,
+            discount_reason: discountData.isApplied ? discountData.discountReason : '',
+            discount_by: discountData.isApplied ? (contract.discount_by || user.name || user.email) : '',
             start_date: startDate,
             notes: notes,
         };
@@ -113,7 +145,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, on
 
                 <div>
                     <div className="flex items-center justify-between mb-1.5 ml-1">
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest">Valeur de la Transaction (DH)</label>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest">Prix Catalogue Propriété (DH)</label>
                         <span className="flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                             <Lock className="w-3 h-3 mr-1" />
                             Fixé par la Propriété
@@ -122,7 +154,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, on
                     <div className="relative">
                         <input
                             type="number"
-                            value={propertyCatalogPrice !== null ? propertyCatalogPrice : amountDh}
+                            value={basePrice}
                             readOnly
                             className={inputClasses + " bg-gray-100/80 cursor-not-allowed font-bold text-gray-800"}
                         />
@@ -130,8 +162,15 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, on
                             DH
                         </div>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1 ml-1">Pour modifier le prix de ce bien, rendez-vous dans la section <strong>Propriétés</strong>.</p>
+                    <p className="text-[10px] text-gray-400 mt-1 ml-1">Pour modifier le prix de base de ce bien, rendez-vous dans la section <strong>Propriétés</strong>.</p>
                 </div>
+
+                {/* Discount Section */}
+                <DiscountSection
+                    catalogPrice={basePrice}
+                    canDiscount={canDiscount}
+                    onChange={(data) => setDiscountData(data)}
+                />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>

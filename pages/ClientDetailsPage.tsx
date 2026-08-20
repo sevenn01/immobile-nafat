@@ -13,7 +13,7 @@ import { EditContractModal } from '../components/EditContractModal';
 import { ChangeApartmentModal } from '../components/ChangeApartmentModal';
 import { ClientDesistementModal } from '../components/ClientDesistementModal';
 import Notification from '../components/Notification';
-import { Edit, Plus, RefreshCw, Lock, Undo2 } from 'lucide-react';
+import { Edit, Plus, RefreshCw, Lock, Undo2, Tag } from 'lucide-react';
 
 // Helper to compress image before saving to Firestore (1MB limit)
 const compressImage = (base64Str: string, maxWidth = 1000, quality = 0.7): Promise<string> => {
@@ -406,7 +406,8 @@ const ClientDetailsPage: React.FC = () => {
                                             const paidPaymentsCount = payments.filter(p => p.contract_id === c.id && p.status === PaymentStatus.Paid).length;
                                             const apt = apartments.find(a => a.id === c.apartment_id || a.apartment_id === c.apartment_id);
                                             const propertyPrice = apt?.sale_price_dh || apt?.price_dh;
-                                            const isPriceMismatch = propertyPrice && c.amount_dh !== propertyPrice;
+                                            const hasDiscount = Boolean(c.discount_dh && c.discount_dh > 0);
+                                            const isPriceMismatch = !hasDiscount && propertyPrice && c.amount_dh !== propertyPrice;
                                             const floorText = apt?.floor ? (apt.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${apt.floor}`) : null;
                                             return (
                                                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
@@ -421,6 +422,12 @@ const ClientDetailsPage: React.FC = () => {
                                                                     🏢 {floorText}
                                                                 </span>
                                                             )}
+                                                            {hasDiscount && (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 w-fit" title={c.discount_reason ? `Motif: ${c.discount_reason}` : undefined}>
+                                                                    <Tag className="w-2.5 h-2.5 mr-1 text-amber-600" />
+                                                                    Remise -{c.discount_dh?.toLocaleString()} DH {c.discount_percentage ? `(${c.discount_percentage}%)` : ''}
+                                                                </span>
+                                                            )}
                                                             {isPriceMismatch && (
                                                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 w-fit" title={`Prix catalogue propriété: ${propertyPrice?.toLocaleString()} DH`}>
                                                                     ⚠️ Différence Prix Propriété ({propertyPrice?.toLocaleString()} DH)
@@ -428,8 +435,18 @@ const ClientDetailsPage: React.FC = () => {
                                                             )}
                                                         </div>
                                                         <div className="text-[10px] text-slate-400 mt-1">
-                                                            <span className="sm:inline hidden">Total: {c.amount_dh.toLocaleString()} DH • </span>
-                                                            <span className="sm:hidden">Total: {c.amount_dh.toLocaleString()} DH <br /></span>
+                                                            <span className="sm:inline hidden">
+                                                                Total: {c.amount_dh.toLocaleString()} DH
+                                                                {hasDiscount && c.original_price_dh && (
+                                                                    <span className="line-through text-slate-400 ml-1">({c.original_price_dh.toLocaleString()} DH)</span>
+                                                                )} • 
+                                                            </span>
+                                                            <span className="sm:hidden">
+                                                                Total: {c.amount_dh.toLocaleString()} DH
+                                                                {hasDiscount && c.original_price_dh && (
+                                                                    <span className="line-through text-slate-400 ml-1">({c.original_price_dh.toLocaleString()} DH)</span>
+                                                                )} <br />
+                                                            </span>
                                                             <span className={`font-semibold ${paidPaymentsCount >= 2 ? 'text-amber-600' : 'text-slate-500'}`}>
                                                                 {paidPaymentsCount} versement{paidPaymentsCount > 1 ? 's' : ''} effectué{paidPaymentsCount > 1 ? 's' : ''}
                                                             </span>
@@ -464,6 +481,11 @@ const ClientDetailsPage: React.FC = () => {
                                                     <td className="hidden sm:table-cell px-4 md:px-6 py-4 md:py-5 text-slate-900">
                                                         <div className="flex flex-col">
                                                             <span className="font-bold">{c.amount_dh.toLocaleString()} DH</span>
+                                                            {hasDiscount && c.original_price_dh && (
+                                                                <span className="text-[10px] text-slate-400 line-through">
+                                                                    Cat: {c.original_price_dh.toLocaleString()} DH
+                                                                </span>
+                                                            )}
                                                             {isPriceMismatch && (
                                                                 <button
                                                                     onClick={async () => {

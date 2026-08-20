@@ -4,6 +4,7 @@ import { Client, Apartment, Contract, ContractStatus, ApartmentStatus, Project, 
 import Modal from './Modal';
 import { useAuth } from '../auth/AuthContext';
 import { Lock } from 'lucide-react';
+import DiscountSection from './DiscountSection';
 
 interface ClientReservationModalProps {
     isOpen: boolean;
@@ -32,6 +33,17 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
     const [durationMonths, setDurationMonths] = useState<string>('12');
     const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [notes, setNotes] = useState<string>('');
+
+    // Discount state
+    const [discountData, setDiscountData] = useState({
+        isApplied: false,
+        discountDh: 0,
+        discountPercentage: 0,
+        discountReason: '',
+        finalNetPrice: 0,
+    });
+
+    const canDiscount = user?.role === 'admin' || user?.permissions?.contracts?.discount === true;
 
     // Reference number and bank for check/virement/effet
     const [initRef, setInitRef] = useState<string>('');
@@ -89,9 +101,17 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
         if (selectedApartmentId) {
             const apt = apartments.find(a => a.id === selectedApartmentId);
             if (apt) {
-                setSalePrice(String(apt.sale_price_dh || apt.price_dh || 0));
+                const base = apt.sale_price_dh || apt.price_dh || 0;
+                setSalePrice(String(base));
                 setAmountPaid('0');
                 setNotes('');
+                setDiscountData({
+                    isApplied: false,
+                    discountDh: 0,
+                    discountPercentage: 0,
+                    discountReason: '',
+                    finalNetPrice: base,
+                });
             }
         } else {
             setSalePrice('0');
@@ -122,7 +142,8 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
             return;
         }
 
-        const totalAmount = Number(salePrice);
+        const basePrice = apt.sale_price_dh || apt.price_dh || 0;
+        const finalAmount = discountData.isApplied ? discountData.finalNetPrice : basePrice;
         const initialDeposit = Number(amountPaid);
         const contractType = apt.intended_for || 'sale';
 
@@ -131,7 +152,12 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
             apartment_id: apt.id,
             project_id: apt.project_id,
             type: contractType as any,
-            amount_dh: totalAmount,
+            amount_dh: finalAmount,
+            original_price_dh: basePrice,
+            discount_dh: discountData.isApplied ? discountData.discountDh : 0,
+            discount_percentage: discountData.isApplied ? discountData.discountPercentage : 0,
+            discount_reason: discountData.isApplied ? discountData.discountReason : '',
+            discount_by: discountData.isApplied ? (user.name || user.email) : '',
             start_date: startDate,
             notes: notes,
         };
@@ -145,7 +171,7 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
             data.end_date = end.toISOString().split('T')[0];
             data.status = ContractStatus.Active;
         } else {
-            data.status = initialDeposit >= totalAmount ? ContractStatus.SaleCompleted : ContractStatus.SaleInProgress;
+            data.status = initialDeposit >= finalAmount ? ContractStatus.SaleCompleted : ContractStatus.SaleInProgress;
             if (initialDeposit > 0) {
                 initialPay = { 
                     amount_dh: initialDeposit, 
@@ -234,7 +260,7 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
                                 <div>
                                     <div className="flex items-center justify-between mb-1.5 ml-1">
                                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                            {isSale ? 'Prix Net (DH)' : 'Loyer Mensuel (DH)'}
+                                            {isSale ? 'Prix Catalogue (DH)' : 'Loyer Mensuel (DH)'}
                                         </label>
                                         <span className="flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                                             <Lock className="w-3 h-3 mr-1" />
@@ -252,7 +278,7 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
                                             DH
                                         </div>
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-1 ml-1">Pour modifier le prix de ce bien, modifiez-le dans la section <strong>Propriétés</strong>.</p>
+                                    <p className="text-[10px] text-slate-400 mt-1 ml-1">Pour modifier le prix de base, modifiez-le dans la section <strong>Propriétés</strong>.</p>
                                 </div>
 
                                 <div>
@@ -266,6 +292,13 @@ export const ClientReservationModal: React.FC<ClientReservationModalProps> = ({ 
                                     />
                                 </div>
                             </div>
+
+                            {/* Discount Section */}
+                            <DiscountSection
+                                catalogPrice={activeApt ? (activeApt.sale_price_dh || activeApt.price_dh || 0) : 0}
+                                canDiscount={canDiscount}
+                                onChange={(data) => setDiscountData(data)}
+                            />
 
                             {isSale ? (
                                 <div className="space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">

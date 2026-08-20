@@ -3,7 +3,8 @@ import { getClients, addContract } from '../services/api';
 import { Client, Apartment, Contract, ContractStatus, ApartmentStatus, Project, Payment, PaymentStatus, PaymentMethod } from '../types';
 import Modal from './Modal';
 import { useAuth } from '../auth/AuthContext';
-import { Lock } from 'lucide-react';
+import { Lock, Sparkles } from 'lucide-react';
+import DiscountSection from './DiscountSection';
 
 interface ReservationModalProps {
     isOpen: boolean;
@@ -28,6 +29,18 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
     const [initPaymentMethod, setInitPaymentMethod] = useState<PaymentMethod>('especes');
     const [durationMonths, setDurationMonths] = useState<string>('12');
 
+    // Discount state
+    const [discountData, setDiscountData] = useState({
+        isApplied: false,
+        discountDh: 0,
+        discountPercentage: 0,
+        discountReason: '',
+        finalNetPrice: 0,
+    });
+
+    const canDiscount = user?.role === 'admin' || user?.permissions?.contracts?.discount === true;
+    const baseCatalogPrice = (apartment?.sale_price_dh || apartment?.price_dh || 0);
+
     useEffect(() => {
         if (isOpen) {
             const fetchClients = async () => {
@@ -47,10 +60,18 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
 
     useEffect(() => {
         if (apartment) {
-            setSalePrice(String(apartment.sale_price_dh || apartment.price_dh || 0));
+            const base = apartment.sale_price_dh || apartment.price_dh || 0;
+            setSalePrice(String(base));
             setAmountPaid('0');
             setInitPaymentMethod('especes');
             setDurationMonths('12');
+            setDiscountData({
+                isApplied: false,
+                discountDh: 0,
+                discountPercentage: 0,
+                discountReason: '',
+                finalNetPrice: base,
+            });
             setError(null);
         }
     }, [apartment]);
@@ -71,9 +92,9 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
             return;
         }
 
-        const totalAmount = Number(salePrice);
+        const basePrice = apartment.sale_price_dh || apartment.price_dh || 0;
+        const finalAmount = discountData.isApplied ? discountData.finalNetPrice : basePrice;
         const initialDeposit = Number(amountPaid);
-
         const contractType = apartment.intended_for || 'sale';
 
         const data: Partial<Contract> = {
@@ -81,7 +102,12 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
             apartment_id: apartment.id,
             project_id: apartment.project_id,
             type: contractType as any,
-            amount_dh: totalAmount,
+            amount_dh: finalAmount,
+            original_price_dh: basePrice,
+            discount_dh: discountData.isApplied ? discountData.discountDh : 0,
+            discount_percentage: discountData.isApplied ? discountData.discountPercentage : 0,
+            discount_reason: discountData.isApplied ? discountData.discountReason : '',
+            discount_by: discountData.isApplied ? (user.name || user.email) : '',
             start_date: formData.get('start_date') as string,
             notes: formData.get('notes') as string,
         };
@@ -95,7 +121,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
             data.end_date = end.toISOString().split('T')[0];
             data.status = ContractStatus.Active;
         } else {
-            data.status = initialDeposit >= totalAmount ? ContractStatus.SaleCompleted : ContractStatus.SaleInProgress;
+            data.status = initialDeposit >= finalAmount ? ContractStatus.SaleCompleted : ContractStatus.SaleInProgress;
             if (initialDeposit > 0) {
                 initialPay = { 
                     amount_dh: initialDeposit, 
@@ -126,6 +152,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
     };
 
     const isSale = apartment.intended_for !== 'rental';
+    const effectivePrice = discountData.isApplied ? discountData.finalNetPrice : baseCatalogPrice;
 
     return (
         <Modal 
@@ -184,7 +211,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
                     <div>
                         <div className="flex items-center justify-between mb-1.5 ml-1">
                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                {isSale ? 'Prix Net (DH)' : 'Loyer Mensuel (DH)'}
+                                {isSale ? 'Prix Catalogue (DH)' : 'Loyer Mensuel (DH)'}
                             </label>
                             <span className="flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                                 <Lock className="w-3 h-3 mr-1" />
@@ -203,7 +230,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
                                 DH
                             </div>
                         </div>
-                        <p className="text-[10px] text-gray-400 mt-1 ml-1">Pour modifier le prix de ce bien, rendez-vous dans la section <strong>Propriétés</strong>.</p>
+                        <p className="text-[10px] text-gray-400 mt-1 ml-1">Pour modifier le prix de base, rendez-vous dans la section <strong>Propriétés</strong>.</p>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Date Signature</label>
@@ -216,6 +243,13 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
                         />
                     </div>
                 </div>
+
+                {/* Discount Section */}
+                <DiscountSection
+                    catalogPrice={baseCatalogPrice}
+                    canDiscount={canDiscount}
+                    onChange={(data) => setDiscountData(data)}
+                />
 
                 <div className="p-4 sm:p-5 bg-blue-50 rounded-xl sm:rounded-2xl border border-blue-100 space-y-4">
                     <h4 className="text-[10px] font-bold text-blue-800 uppercase tracking-widest">Acompte Initial</h4>

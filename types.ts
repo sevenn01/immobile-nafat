@@ -106,6 +106,11 @@ export interface Contract {
   apartment_id: string;
   project_id: string;
   amount_dh: number;
+  original_price_dh?: number;
+  discount_dh?: number;
+  discount_percentage?: number;
+  discount_reason?: string;
+  discount_by?: string;
   type: 'rental' | 'sale';
   start_date: string;
   status: ContractStatus;
@@ -123,6 +128,12 @@ export interface Contract {
   refund_status?: 'none' | 'total' | 'partial';
   refund_amount?: number;
   refund_notes?: string;
+  final_contract_created?: boolean;
+  final_contract_date?: string;
+  contract_titre?: string;
+  notary_name?: string;
+  final_contract_reference?: string;
+  final_contract_clauses?: string;
 }
 
 export interface Payment {
@@ -153,6 +164,7 @@ export interface PermissionSet {
     create: boolean;
     edit: boolean;
     delete: boolean;
+    discount?: boolean;
 }
 
 export interface AppPermissions {
