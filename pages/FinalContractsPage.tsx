@@ -21,13 +21,15 @@ import {
     Clock,
     Tag,
     Building,
-    Filter
+    LayoutGrid,
+    Table as TableIcon
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import Modal from '../components/Modal';
 import CreateFinalContractModal from '../components/CreateFinalContractModal';
 
 type FilterTab = 'all' | 'created' | 'pending' | 'completed_paid';
+type ViewMode = 'table' | 'cards';
 
 export const FinalContractsPage: React.FC = () => {
     const [contracts, setContracts] = useState<Contract[]>([]);
@@ -39,6 +41,7 @@ export const FinalContractsPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
     const [activeTab, setActiveTab] = useState<FilterTab>('all');
+    const [viewMode, setViewMode] = useState<ViewMode>('table');
     const { user } = useAuth();
     const navigate = useNavigate();
 
@@ -415,7 +418,7 @@ export const FinalContractsPage: React.FC = () => {
             </div>
 
             {/* Search & Action Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-100 shadow-sm">
                 <div className="relative flex-1 w-full">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Search className="h-5 w-5 text-gray-400" />
@@ -425,11 +428,44 @@ export const FinalContractsPage: React.FC = () => {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         placeholder="Rechercher par client, CIN, appartement, titre foncier, projet..."
-                        className="block w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-sm placeholder-gray-400 font-medium bg-gray-50/50"
+                        className="block w-full pl-10 pr-4 py-2 sm:py-2.5 border border-gray-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 text-sm placeholder-gray-400 font-medium bg-gray-50/50"
                     />
                 </div>
-                <div className="text-sm font-semibold text-gray-500 self-center whitespace-nowrap">
-                    {filteredContracts.length} dossier(s) affiché(s)
+
+                <div className="flex items-center justify-between sm:justify-end gap-3">
+                    <div className="text-xs sm:text-sm font-semibold text-gray-500 whitespace-nowrap">
+                        {filteredContracts.length} dossier(s)
+                    </div>
+
+                    {/* View Switcher (Table / Cards) */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('table')}
+                            className={`p-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 ${
+                                viewMode === 'table'
+                                    ? 'bg-white text-emerald-800 shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                            title="Vue Tableau (colonnes fixes)"
+                        >
+                            <TableIcon className="w-4 h-4" />
+                            <span className="hidden md:inline text-xs">Tableau</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('cards')}
+                            className={`p-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 ${
+                                viewMode === 'cards'
+                                    ? 'bg-white text-emerald-800 shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                            title="Vue Cartes / Grille (très visible)"
+                        >
+                            <LayoutGrid className="w-4 h-4" />
+                            <span className="hidden md:inline text-xs">Cartes</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -464,236 +500,355 @@ export const FinalContractsPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Main Table */}
+            {/* Main Content (Table or Cards View) */}
             {filteredContracts.length > 0 ? (
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50/80">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                        Client & CIN
-                                    </th>
-                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                        Bien & Projet
-                                    </th>
-                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                        Titre Foncier
-                                    </th>
-                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                        Prix & Règlements
-                                    </th>
-                                    <th scope="col" className="px-6 py-3.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                        Statut de l'Acte
-                                    </th>
-                                    <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                        Remarques
-                                    </th>
-                                    <th scope="col" className="px-6 py-3.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredContracts.map((item) => {
-                                    const percent = item.amount_dh > 0 ? Math.min(100, Math.round((item.totalPaid / item.amount_dh) * 100)) : 0;
-                                    return (
-                                        <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                                            {/* Client */}
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="p-2 bg-emerald-50 rounded-xl text-emerald-700">
-                                                        <User className="w-5 h-5" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-sm font-bold text-gray-900">{item.client?.full_name}</div>
-                                                        <div className="text-xs text-gray-500 font-medium">CIN: {item.client?.cin_number}</div>
-                                                        {item.client?.phone && (
-                                                            <div className="text-[11px] text-gray-400">{item.client.phone}</div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* Apartment & Project */}
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div>
-                                                    <div className="text-sm font-bold text-gray-900">{item.apartment?.name}</div>
-                                                    <div className="text-xs text-emerald-700 font-semibold">{item.project?.project_name}</div>
-                                                    <div className="text-[11px] text-gray-400">
-                                                        {item.apartment?.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${item.apartment?.floor}`} • {item.apartment?.surface_m2} m²
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* Titre Foncier */}
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                {item.effectiveTitre ? (
-                                                    <div className="space-y-1">
-                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200">
-                                                            <Tag className="w-3 h-3 mr-1 text-amber-600" />
-                                                            {item.effectiveTitre}
-                                                        </span>
-                                                        <div className="text-[10px] text-emerald-600 font-medium">Titre associé</div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="space-y-1">
-                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
-                                                            Non renseigné
-                                                        </span>
-                                                        <div className="text-[10px] text-amber-600 font-medium">À définir lors de l'acte</div>
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            {/* Price & Payments */}
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="space-y-1">
-                                                    <div className="text-sm font-bold text-gray-900">
-                                                        {item.amount_dh.toLocaleString()} DH
-                                                        {item.discount_dh && item.discount_dh > 0 ? (
-                                                            <span className="ml-1 text-[10px] font-bold text-amber-600">(-{item.discount_dh.toLocaleString()} DH)</span>
-                                                        ) : null}
-                                                    </div>
-                                                    <div className="flex items-center space-x-2">
-                                                        <div className="w-20 bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                                            <div 
-                                                                className={`h-full rounded-full ${item.isFullyPaid ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                                                                style={{ width: `${percent}%` }}
-                                                            />
+                viewMode === 'table' ? (
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                        <div className="overflow-x-auto overflow-y-auto max-h-[480px] relative scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                            <table className="min-w-full divide-y divide-gray-200 text-left border-collapse">
+                                <thead className="sticky top-0 z-30 bg-gray-100 text-gray-700 font-bold text-xs uppercase tracking-wider shadow-xs">
+                                    <tr>
+                                        <th scope="col" className="px-4 py-3.5 text-left bg-gray-100">
+                                            Client & CIN
+                                        </th>
+                                        <th scope="col" className="px-4 py-3.5 text-left bg-gray-100">
+                                            Bien & Titre
+                                        </th>
+                                        <th scope="col" className="px-4 py-3.5 text-left bg-gray-100">
+                                            Prix & Règlements
+                                        </th>
+                                        <th scope="col" className="px-4 py-3.5 text-center bg-gray-100">
+                                            Statut Acte
+                                        </th>
+                                        <th scope="col" className="px-4 py-3.5 text-left bg-gray-100 hidden lg:table-cell">
+                                            Remarques
+                                        </th>
+                                        {/* STICKY RIGHT ACTIONS COLUMN (Opaque) */}
+                                        <th 
+                                            scope="col" 
+                                            className="sticky right-0 top-0 bg-gray-200 px-4 py-3.5 text-center text-xs font-bold text-gray-800 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.1)] z-40"
+                                        >
+                                            Actions Rapides
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {filteredContracts.map((item) => {
+                                        const percent = item.amount_dh > 0 ? Math.min(100, Math.round((item.totalPaid / item.amount_dh) * 100)) : 0;
+                                        return (
+                                            <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                                                {/* Client */}
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <div className="flex items-center space-x-2.5">
+                                                        <div className="p-2 bg-emerald-50 rounded-xl text-emerald-700 shrink-0">
+                                                            <User className="w-4 h-4" />
                                                         </div>
-                                                        <span className="text-[10px] font-bold text-gray-500">{percent}%</span>
-                                                    </div>
-                                                    <div className="text-[10px] text-gray-400">
-                                                        Payé: <strong className="text-emerald-700">{item.totalPaid.toLocaleString()} DH</strong>
-                                                        {item.remaining > 0 && (
-                                                            <span> • Reste: <strong className="text-amber-600">{item.remaining.toLocaleString()} DH</strong></span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* Contract Status */}
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                {item.isContractCreated ? (
-                                                    <div className="inline-flex flex-col items-center space-y-0.5">
-                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                                            <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" /> ACTE ÉTABLI
-                                                        </span>
-                                                        {item.final_contract_date && (
-                                                            <span className="text-[10px] text-gray-400">
-                                                                {new Date(item.final_contract_date).toLocaleDateString('fr-FR')}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <div className="inline-flex flex-col items-center space-y-0.5">
-                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                                            <Clock className="w-3.5 h-3.5 mr-1 text-amber-500" /> EN ATTENTE
-                                                        </span>
-                                                        <span className="text-[10px] text-gray-400">Réservation active</span>
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            {/* Notes */}
-                                            <td className="px-6 py-4">
-                                                {editingContractId === item.id ? (
-                                                    <div className="flex items-center space-x-1.5 min-w-[150px]">
-                                                        <input
-                                                            type="text"
-                                                            value={editingNotesText}
-                                                            onChange={(e) => setEditingNotesText(e.target.value)}
-                                                            className="block w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
-                                                            placeholder="Observations..."
-                                                            autoFocus
-                                                        />
-                                                        <button
-                                                            onClick={() => handleSaveNotes(item.id)}
-                                                            disabled={updatingId === item.id}
-                                                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                                                            title="Enregistrer"
-                                                        >
-                                                            {updatingId === item.id ? (
-                                                                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-emerald-600" />
-                                                            ) : (
-                                                                <Check className="w-3.5 h-3.5" />
+                                                        <div>
+                                                            <div className="text-sm font-bold text-gray-900 leading-tight">{item.client?.full_name}</div>
+                                                            <div className="text-xs text-gray-500 font-medium">CIN: {item.client?.cin_number}</div>
+                                                            {item.client?.phone && (
+                                                                <div className="text-[11px] text-gray-400">{item.client.phone}</div>
                                                             )}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setEditingContractId(null)}
-                                                            className="p-1 text-red-500 hover:bg-red-50 rounded-lg"
-                                                            title="Annuler"
-                                                        >
-                                                            <X className="w-3.5 h-3.5" />
-                                                        </button>
+                                                        </div>
                                                     </div>
-                                                ) : (
-                                                    <div className="flex items-center space-x-2 group max-w-[180px]">
-                                                        <span className="text-xs text-gray-600 truncate font-medium block">
-                                                            {item.notes || <span className="text-gray-400 italic font-normal">Aucune</span>}
-                                                        </span>
-                                                        <button
-                                                            onClick={() => {
-                                                                setEditingContractId(item.id);
-                                                                setEditingNotesText(item.notes || '');
-                                                            }}
-                                                            className="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                                            title="Modifier"
-                                                        >
-                                                            <Pencil className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </td>
+                                                </td>
 
-                                            {/* Actions */}
-                                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                                <div className="flex items-center justify-center space-x-2">
+                                                {/* Apartment & Project & Titre */}
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <div>
+                                                        <div className="flex items-center space-x-1.5">
+                                                            <span className="text-sm font-bold text-gray-900">{item.apartment?.name}</span>
+                                                            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                                                {item.project?.project_name}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-[11px] text-gray-400 mt-0.5">
+                                                            {item.apartment?.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${item.apartment?.floor}`} • {item.apartment?.surface_m2} m²
+                                                        </div>
+                                                        <div className="mt-1">
+                                                            {item.effectiveTitre ? (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                                                                    <Tag className="w-3 h-3 mr-1 text-amber-600" />
+                                                                    {item.effectiveTitre}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                                                                    Titre à définir
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                {/* Price & Payments */}
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <div className="space-y-1 min-w-[140px]">
+                                                        <div className="text-sm font-bold text-gray-900">
+                                                            {item.amount_dh.toLocaleString()} DH
+                                                        </div>
+                                                        <div className="flex items-center space-x-1.5">
+                                                            <div className="w-16 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                                                <div 
+                                                                    className={`h-full rounded-full ${item.isFullyPaid ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                                                                    style={{ width: `${percent}%` }}
+                                                                />
+                                                            </div>
+                                                            <span className="text-[10px] font-bold text-gray-500">{percent}%</span>
+                                                        </div>
+                                                        <div className="text-[10px] text-gray-400">
+                                                            Payé: <strong className="text-emerald-700">{item.totalPaid.toLocaleString()} DH</strong>
+                                                            {item.remaining > 0 && (
+                                                                <span> • Reste: <strong className="text-amber-600">{item.remaining.toLocaleString()} DH</strong></span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                {/* Contract Status */}
+                                                <td className="px-4 py-3 whitespace-nowrap text-center">
                                                     {item.isContractCreated ? (
-                                                        <>
-                                                            <button
-                                                                onClick={() => handleOpenPreviewModal(item)}
-                                                                className="inline-flex items-center px-3 py-1.5 border border-emerald-200 rounded-xl shadow-2xs text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                                                title="Voir l'acte de vente officiel"
-                                                            >
-                                                                <FileText className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                                                                <span>Voir l'Acte</span>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleOpenCreateModal(item, true)}
-                                                                className="inline-flex items-center p-1.5 border border-slate-200 rounded-xl text-slate-600 hover:text-emerald-700 hover:bg-slate-100 transition-colors"
-                                                                title="Modifier les données de l'acte (titre, date, notaire...)"
-                                                            >
-                                                                <Pencil className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        </>
+                                                        <div className="inline-flex flex-col items-center space-y-0.5">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                                <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" /> ACTE ÉTABLI
+                                                            </span>
+                                                            {item.final_contract_date && (
+                                                                <span className="text-[10px] text-gray-400">
+                                                                    {new Date(item.final_contract_date).toLocaleDateString('fr-FR')}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     ) : (
-                                                        <button
-                                                            onClick={() => handleOpenCreateModal(item, false)}
-                                                            className="inline-flex items-center px-3.5 py-1.5 rounded-xl shadow-xs text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all hover:shadow space-x-1"
-                                                        >
-                                                            <PlusCircle className="w-3.5 h-3.5" />
-                                                            <span>Créer le Contrat</span>
-                                                        </button>
+                                                        <div className="inline-flex flex-col items-center space-y-0.5">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                                                <Clock className="w-3 h-3 mr-1 text-amber-500" /> EN ATTENTE
+                                                            </span>
+                                                            <span className="text-[10px] text-gray-400">À contractualiser</span>
+                                                        </div>
                                                     )}
+                                                </td>
 
-                                                    <button
-                                                        onClick={() => navigate(`/clients/${item.client_id}`)}
-                                                        className="inline-flex items-center p-1.5 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors"
-                                                        title="Consulter la fiche client"
-                                                    >
-                                                        <Eye className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                                                {/* Notes (hidden on smaller viewports to give space) */}
+                                                <td className="px-4 py-3 hidden lg:table-cell">
+                                                    {editingContractId === item.id ? (
+                                                        <div className="flex items-center space-x-1.5 min-w-[130px]">
+                                                            <input
+                                                                type="text"
+                                                                value={editingNotesText}
+                                                                onChange={(e) => setEditingNotesText(e.target.value)}
+                                                                className="block w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                                                                placeholder="Observations..."
+                                                                autoFocus
+                                                            />
+                                                            <button
+                                                                onClick={() => handleSaveNotes(item.id)}
+                                                                disabled={updatingId === item.id}
+                                                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                                                                title="Enregistrer"
+                                                            >
+                                                                {updatingId === item.id ? (
+                                                                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-emerald-600" />
+                                                                ) : (
+                                                                    <Check className="w-3.5 h-3.5" />
+                                                                )}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setEditingContractId(null)}
+                                                                className="p-1 text-red-500 hover:bg-red-50 rounded-lg"
+                                                                title="Annuler"
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center space-x-1 group max-w-[140px]">
+                                                            <span className="text-xs text-gray-600 truncate font-medium block">
+                                                                {item.notes || <span className="text-gray-400 italic font-normal">Aucune</span>}
+                                                            </span>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingContractId(item.id);
+                                                                    setEditingNotesText(item.notes || '');
+                                                                }}
+                                                                className="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                                title="Modifier"
+                                                            >
+                                                                <Pencil className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
+
+                                                {/* STICKY RIGHT ACTIONS (Solid Opaque Background) */}
+                                                <td className="sticky right-0 bg-white group-hover:bg-slate-50 px-4 py-3 whitespace-nowrap text-center text-sm font-medium shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.08)] z-20">
+                                                    <div className="flex items-center justify-center space-x-1.5 bg-inherit">
+                                                        {item.isContractCreated ? (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => handleOpenPreviewModal(item)}
+                                                                    className="inline-flex items-center px-3 py-1.5 border border-emerald-300 rounded-xl shadow-xs text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-all cursor-pointer"
+                                                                    title="Voir l'acte de vente officiel"
+                                                                >
+                                                                    <FileText className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                                                                    <span>Voir l'Acte</span>
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleOpenCreateModal(item, true)}
+                                                                    className="inline-flex items-center p-1.5 border border-slate-200 rounded-xl text-slate-600 hover:text-emerald-700 hover:bg-slate-100 transition-colors"
+                                                                    title="Modifier les données de l'acte (titre, date, notaire...)"
+                                                                >
+                                                                    <Pencil className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleOpenCreateModal(item, false)}
+                                                                className="inline-flex items-center px-3.5 py-1.5 rounded-xl shadow-xs text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all hover:shadow cursor-pointer space-x-1"
+                                                                title="Établir le contrat officiel pour ce client"
+                                                            >
+                                                                <PlusCircle className="w-3.5 h-3.5" />
+                                                                <span>Créer Contrat</span>
+                                                            </button>
+                                                        )}
+
+                                                        <button
+                                                            onClick={() => navigate(`/clients/${item.client_id}`)}
+                                                            className="inline-flex items-center p-1.5 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+                                                            title="Consulter la fiche client"
+                                                        >
+                                                            <Eye className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        {/* Table Footer with count & scroll indicator */}
+                        <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500 font-medium">
+                            <span>Affichage de <strong>{filteredContracts.length}</strong> dossiers</span>
+                            {filteredContracts.length > 5 && (
+                                <span className="text-[11px] text-slate-400 italic">Défilez vers le bas pour voir l'ensemble des dossiers ↓</span>
+                            )}
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    /* CARDS VIEW: 100% visible, no horizontal scroll, beautiful & direct */
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredContracts.map((item) => {
+                            const percent = item.amount_dh > 0 ? Math.min(100, Math.round((item.totalPaid / item.amount_dh) * 100)) : 0;
+                            return (
+                                <div 
+                                    key={item.id}
+                                    className="bg-white border border-gray-200 rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                                >
+                                    {/* Top Card Header */}
+                                    <div>
+                                        <div className="flex items-start justify-between gap-2 mb-3">
+                                            <div className="flex items-center space-x-2.5">
+                                                <div className="p-2 bg-emerald-50 rounded-xl text-emerald-700 shrink-0">
+                                                    <User className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-extrabold text-gray-900">{item.client?.full_name}</h4>
+                                                    <p className="text-xs text-gray-500 font-medium">CIN: {item.client?.cin_number}</p>
+                                                </div>
+                                            </div>
+                                            {item.isContractCreated ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 whitespace-nowrap">
+                                                    <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" /> ACTE ÉTABLI
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
+                                                    <Clock className="w-3 h-3 mr-1 text-amber-500" /> EN ATTENTE
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Property info */}
+                                        <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-gray-900">{item.apartment?.name}</span>
+                                                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                                                    {item.project?.project_name}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                                <span>{item.apartment?.floor === 'RDC' ? 'RDC' : `Étage ${item.apartment?.floor}`} • {item.apartment?.surface_m2} m²</span>
+                                                {item.effectiveTitre ? (
+                                                    <span className="inline-flex items-center font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-[10px]">
+                                                        <Tag className="w-2.5 h-2.5 mr-0.5 text-amber-600" /> {item.effectiveTitre}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] text-gray-400 italic">Titre à définir</span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Financial Progress */}
+                                        <div className="mt-3 space-y-1.5">
+                                            <div className="flex justify-between text-xs font-bold">
+                                                <span className="text-gray-700">Prix total:</span>
+                                                <span className="text-gray-900">{item.amount_dh.toLocaleString()} DH</span>
+                                            </div>
+                                            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                                                <div 
+                                                    className={`h-full rounded-full ${item.isFullyPaid ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                                                    style={{ width: `${percent}%` }}
+                                                />
+                                            </div>
+                                            <div className="flex justify-between text-[11px] text-gray-500">
+                                                <span>Payé: <strong className="text-emerald-700">{item.totalPaid.toLocaleString()} DH</strong> ({percent}%)</span>
+                                                {item.remaining > 0 && (
+                                                    <span>Reste: <strong className="text-amber-600">{item.remaining.toLocaleString()} DH</strong></span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Buttons: Visible & Clear */}
+                                    <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                                        <button
+                                            onClick={() => navigate(`/clients/${item.client_id}`)}
+                                            className="inline-flex items-center px-2.5 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                                            title="Fiche client"
+                                        >
+                                            <Eye className="w-3.5 h-3.5 mr-1" /> Fiche
+                                        </button>
+
+                                        {item.isContractCreated ? (
+                                            <div className="flex items-center space-x-1.5">
+                                                <button
+                                                    onClick={() => handleOpenCreateModal(item, true)}
+                                                    className="p-2 border border-slate-200 rounded-xl text-slate-600 hover:text-emerald-700 hover:bg-slate-50 transition-colors"
+                                                    title="Modifier l'acte"
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleOpenPreviewModal(item)}
+                                                    className="inline-flex items-center px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl text-xs font-bold text-emerald-800 transition-all shadow-xs"
+                                                >
+                                                    <FileText className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+                                                    <span>Voir l'Acte</span>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleOpenCreateModal(item, false)}
+                                                className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-xs font-bold text-white shadow-xs transition-all hover:shadow space-x-1.5"
+                                            >
+                                                <PlusCircle className="w-3.5 h-3.5" />
+                                                <span>Créer le Contrat</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )
             ) : (
                 <div className="bg-white rounded-3xl border border-gray-200 p-12 text-center shadow-sm max-w-2xl mx-auto">
                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-100">
