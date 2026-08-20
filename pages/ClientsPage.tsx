@@ -18,7 +18,11 @@ const ClientCard: React.FC<{
     onViewPdf: (client: Client) => void;
 }> = ({ client, contracts, apartments, projects, onEdit, onDelete, onViewPdf }) => {
   const navigate = useNavigate();
-  const clientContracts = contracts.filter(c => c.client_id === client.id);
+  const clientContracts = contracts.filter(c => 
+    c.client_id === client.id || 
+    c.client_id === client.client_id || 
+    (client.contracts && (client.contracts.includes(c.id) || client.contracts.includes(c.contract_id)))
+  );
   const activeContracts = clientContracts.filter(c => c.status === ContractStatus.Active || c.status === ContractStatus.SaleInProgress);
 
   return (
@@ -343,10 +347,10 @@ const ClientsPage: React.FC = () => {
                                 <td className="px-6 py-4">
                                     <div className="flex flex-col gap-1">
                                         <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg w-fit">
-                                            {contracts.filter(c => c.client_id === client.id).length} dossier(s)
+                                            {contracts.filter(c => c.client_id === client.id || c.client_id === client.client_id || (client.contracts && (client.contracts.includes(c.id) || client.contracts.includes(c.contract_id)))).length} dossier(s)
                                         </span>
                                         {(() => {
-                                            const clientContracts = contracts.filter(c => c.client_id === client.id);
+                                            const clientContracts = contracts.filter(c => c.client_id === client.id || c.client_id === client.client_id || (client.contracts && (client.contracts.includes(c.id) || client.contracts.includes(c.contract_id))));
                                             if (clientContracts.length > 0) {
                                                 return (
                                                     <div className="flex flex-col gap-1 mt-1">

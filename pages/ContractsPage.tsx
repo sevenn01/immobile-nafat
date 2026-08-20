@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { getContracts, getClients, getApartments, addContract, cancelContract, getProjects, deleteContract, getPayments } from '../services/api';
+import { getContracts, getClients, getApartments, addContract, cancelContract, getProjects, deleteContract, getPayments, syncContractPricesWithProperties } from '../services/api';
 import { Contract, Client, Apartment, ContractStatus, ApartmentStatus, Project, Payment, PaymentStatus, PaymentMethod } from '../types';
 import { PlusIcon, EyeIcon, EditIcon, TrashIcon, SearchIcon, XCircleIcon, FileTextIcon, HomeIcon, UsersIcon, AlertTriangleIcon, PaperclipIcon, CloseIcon, PrinterIcon } from '../components/icons/Icons';
+import { Lock } from 'lucide-react';
 import Modal from '../components/Modal';
 import { useAuth } from '../auth/AuthContext';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -184,7 +185,7 @@ const ContractsPage: React.FC = () => {
 
     const filteredContracts = useMemo(() => {
         return contracts.filter(c => {
-            const client = clients.find(cl => cl.id === c.client_id);
+            const client = clients.find(cl => cl.id === c.client_id || cl.client_id === c.client_id || (cl.contracts && cl.contracts.includes(c.id)));
             const nameMatch = (client?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase());
             const statusMatch = filters.status === 'all' || c.status === filters.status;
             const typeMatch = filters.type === 'all' || c.type === filters.type;
@@ -334,6 +335,36 @@ const ContractsPage: React.FC = () => {
         setRefundNotes('');
     };
 
+    const [isSyncingPrices, setIsSyncingPrices] = useState(false);
+
+    const handleSyncAllPrices = async () => {
+        if (!user) return;
+        try {
+            setIsSyncingPrices(true);
+            const result = await syncContractPricesWithProperties(user.user_id);
+            await fetchData();
+            if (result.updatedCount > 0) {
+                setNotification({
+                    message: `Synchronisation réussie : ${result.updatedCount} prix de contrat(s) aligné(s) sur le catalogue officiel des propriétés.`,
+                    type: 'success'
+                });
+            } else {
+                setNotification({
+                    message: "Tous les prix des contrats sont déjà 100% identiques aux prix des propriétés.",
+                    type: 'success'
+                });
+            }
+        } catch (err: any) {
+            console.error("Error syncing prices:", err);
+            setNotification({
+                message: "Erreur lors de la synchronisation des prix.",
+                type: 'error'
+            });
+        } finally {
+            setIsSyncingPrices(false);
+        }
+    };
+
     if (loading) return <div className="p-8 text-center text-gray-500 italic font-bold">Chargement des dossiers...</div>;
 
   return (
@@ -342,10 +373,20 @@ const ContractsPage: React.FC = () => {
         
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Dossiers de Réservation</h2>
-            <button onClick={() => setIsTypeSelectionModalOpen(true)} className="w-full md:w-auto justify-center px-5 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all flex items-center shadow-lg font-bold active:scale-95 text-sm md:text-base">
-                <PlusIcon className="w-5 h-5 mr-1" />
-                Nouveau
-            </button>
+            <div className="flex items-center gap-3 w-full md:w-auto">
+                <button 
+                    onClick={handleSyncAllPrices} 
+                    disabled={isSyncingPrices}
+                    className="flex-1 md:flex-initial px-4 py-2.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-xl transition-all flex items-center justify-center font-bold text-xs md:text-sm active:scale-95 disabled:opacity-50"
+                    title="Vérifie et aligne automatiquement tous les prix des réservations sur les prix des propriétés"
+                >
+                    {isSyncingPrices ? "Synchronisation en cours..." : "⚡ Aligner Prix sur Propriétés"}
+                </button>
+                <button onClick={() => setIsTypeSelectionModalOpen(true)} className="flex-1 md:flex-initial justify-center px-5 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all flex items-center shadow-lg font-bold active:scale-95 text-sm md:text-base">
+                    <PlusIcon className="w-5 h-5 mr-1" />
+                    Nouveau
+                </button>
+            </div>
         </div>
 
         <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-gray-200 p-4 md:p-6 mb-8 space-y-6">
@@ -454,26 +495,36 @@ const ContractsPage: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {filteredContracts.map(c => (
+                        {filteredContracts.map(c => {
+                            const client = clients.find(cl => cl.id === c.client_id || cl.client_id === c.client_id || (cl.contracts && cl.contracts.includes(c.id)));
+                            const apt = apartments.find(a => a.id === c.apartment_id || a.apartment_id === c.apartment_id);
+                            const project = projects.find(p => p.id === c.project_id || p.id === apt?.project_id);
+                            const propertyPrice = apt?.sale_price_dh || apt?.price_dh;
+                            const isPriceMismatch = propertyPrice && c.amount_dh !== propertyPrice;
+
+                            return (
                             <tr 
                                 key={c.id} 
                                 className={`hover:bg-gray-50/50 transition-colors group cursor-pointer ${c.status === ContractStatus.SaleCanceled || c.status === ContractStatus.Canceled ? 'bg-gray-50/30' : ''}`}
-                                onClick={() => navigate(`/clients/${c.client_id}`)}
+                                onClick={() => navigate(`/clients/${c.client_id || client?.id}`)}
                             >
                                 <td className="px-4 md:px-6 py-4">
                                     <div className="font-bold text-gray-900 group-hover:text-green-600 transition-colors text-sm">
-                                        {clients.find(cl => cl.id === c.client_id)?.full_name}
+                                        {client?.full_name || 'Client Inconnu'}
                                     </div>
-                                    <div className="text-[10px] sm:text-xs text-gray-400">{clients.find(cl => cl.id === c.client_id)?.phone}</div>
+                                    <div className="text-[10px] sm:text-xs text-gray-400">{client?.phone}</div>
                                     {/* Mobile only info */}
                                     <div className="sm:hidden mt-1 flex flex-wrap gap-1">
-                                        <span className="text-[8px] font-bold uppercase text-gray-400 bg-gray-100 px-1 rounded">{apartments.find(a => a.id === c.apartment_id)?.name}</span>
+                                        <span className="text-[8px] font-bold uppercase text-gray-400 bg-gray-100 px-1 rounded">{apt?.name || 'Propriété'}</span>
                                         <span className={`text-[8px] font-bold uppercase px-1 rounded ${c.type === 'rental' ? 'bg-green-50 text-green-600' : 'bg-purple-50 text-purple-600'}`}>{c.type === 'rental' ? 'Loc' : 'Vente'}</span>
+                                        {isPriceMismatch && (
+                                            <span className="text-[8px] font-bold text-amber-700 bg-amber-100 px-1 rounded">⚠️ Prix non aligné ({propertyPrice?.toLocaleString()} DH)</span>
+                                        )}
                                     </div>
                                 </td>
                                 <td className="hidden sm:table-cell px-4 md:px-6 py-4 text-sm">
-                                    <div className="font-bold text-gray-700">{apartments.find(a => a.id === c.apartment_id)?.name}</div>
-                                    <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">{projects.find(p => p.id === c.project_id)?.project_name}</div>
+                                    <div className="font-bold text-gray-700">{apt?.name || 'Propriété'}</div>
+                                    <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">{project?.project_name || 'Projet'}</div>
                                 </td>
                                 <td className="hidden md:table-cell px-4 md:px-6 py-4 italic">
                                     <span className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${c.type === 'rental' ? 'bg-green-50 text-green-600' : 'bg-purple-50 text-purple-600'}`}>
@@ -482,6 +533,11 @@ const ContractsPage: React.FC = () => {
                                 </td>
                                 <td className="px-4 md:px-6 py-4">
                                     <div className="font-bold text-gray-900 text-sm">{c.amount_dh.toLocaleString()} <span className="text-[10px]">DH</span></div>
+                                    {isPriceMismatch && (
+                                        <div className="hidden sm:block text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded mt-0.5 w-fit">
+                                            ⚠️ Prix Prop.: {propertyPrice?.toLocaleString()} DH
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="px-4 md:px-6 py-4">
                                     <span className={getStatusBadge(c.status).replace('px-2 py-1 text-xs', 'px-1.5 py-0.5 text-[10px] sm:text-xs')}>{translateStatus(c.status)}</span>
@@ -500,7 +556,8 @@ const ContractsPage: React.FC = () => {
                                     </div>
                                 </td>
                             </tr>
-                        ))}
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -562,7 +619,30 @@ const ContractsPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">{newContractType === 'sale' ? 'Prix Net (DH)' : 'Loyer Mensuel (DH)'}</label><input type="number" step="any" value={salePrice} onChange={e => setSalePrice(e.target.value)} className={inputClasses} /></div>
+                    <div>
+                        <div className="flex items-center justify-between mb-1.5 ml-1">
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                {newContractType === 'sale' ? 'Prix Net (DH)' : 'Loyer Mensuel (DH)'}
+                            </label>
+                            <span className="flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                <Lock className="w-3 h-3 mr-1" />
+                                Fixé par la Propriété
+                            </span>
+                        </div>
+                        <div className="relative">
+                            <input 
+                                type="number" 
+                                step="any" 
+                                value={salePrice} 
+                                readOnly
+                                className={inputClasses + " bg-gray-100/80 cursor-not-allowed font-bold text-gray-800"} 
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs font-bold text-gray-400">
+                                DH
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1 ml-1">Pour modifier le prix de ce bien, rendez-vous dans la section <strong>Propriétés</strong>.</p>
+                    </div>
                     <div><label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Date Signature</label><input type="date" name="start_date" required defaultValue={new Date().toISOString().split('T')[0]} className={inputClasses} /></div>
                 </div>
 

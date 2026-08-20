@@ -85,8 +85,17 @@ export const AllClientsPdfModal: React.FC<AllClientsPdfModalProps> = ({ onClose,
 
     // Computations per client
     const compiledClientsList = clients.map(client => {
-        const clientContracts = contracts.filter(c => c.client_id === client.id && c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled && c.status !== ContractStatus.Ended);
-        const clientPayments = payments.filter(p => p.client_id === client.id && p.status === 'paid');
+        const clientContracts = contracts.filter(c => 
+            (c.client_id === client.id || c.client_id === client.client_id || (client.contracts && (client.contracts.includes(c.id) || client.contracts.includes(c.contract_id)))) && 
+            c.status !== ContractStatus.Canceled && 
+            c.status !== ContractStatus.SaleCanceled && 
+            c.status !== ContractStatus.Ended
+        );
+        const clientContractIds = new Set(clientContracts.flatMap(c => [c.id, c.contract_id].filter(Boolean)));
+        const clientPayments = payments.filter(p => 
+            (p.client_id === client.id || p.client_id === client.client_id || (p.contract_id && clientContractIds.has(p.contract_id))) && 
+            p.status === 'paid'
+        );
 
         const totalCommitted = clientContracts.reduce((sum, c) => sum + c.amount_dh, 0);
         const totalPaid = clientPayments.reduce((sum, p) => sum + p.amount_dh, 0);

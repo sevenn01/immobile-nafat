@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom';
 import { DashboardIcon, BuildingIcon, HomeIcon, UsersIcon, FileTextIcon, PaymentIcon, CloseIcon, SettingsIcon, AlertTriangleIcon } from './icons/Icons';
 import { useAuth } from '../auth/AuthContext';
 import { AppPermissions, User } from '../types';
+import { Sparkles } from 'lucide-react';
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface MobileMenuProps {
 
 const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth() as { user: User | null };
+  const isDevUser = user?.email?.toLowerCase() === 'dev@dev';
   
   const commonLinkClass = "flex items-center px-4 py-3 text-slate-700 font-semibold text-sm transition-all duration-200 rounded-xl active:scale-98";
   const activeLinkClass = "bg-emerald-600 text-white shadow-md shadow-emerald-200/80 font-bold";
@@ -89,6 +91,12 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
                         <NavLink to="/projets" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass}`}>
                             <BuildingIcon className="w-5 h-5 mr-3 shrink-0" />
                             <span>Projets</span>
+                        </NavLink>
+                    )}
+                    {isDevUser && (
+                        <NavLink to="/plan-3d" onClick={handleLinkClick} className={({ isActive }) => `${commonLinkClass} ${isActive ? 'bg-amber-600 text-white font-bold' : inactiveLinkClass}`}>
+                            <Sparkles className="w-5 h-5 mr-3 shrink-0 text-amber-400" />
+                            <span>Plan 3D (Dev)</span>
                         </NavLink>
                     )}
                     {canView('apartments') && (

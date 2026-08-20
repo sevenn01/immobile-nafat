@@ -3,7 +3,7 @@ import { getApartments, getProjects, changeContractApartment } from '../services
 import { Contract, Apartment, Project, ApartmentStatus } from '../types';
 import Modal from './Modal';
 import { useAuth } from '../auth/AuthContext';
-import { AlertTriangle, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, ArrowRight, Lock } from 'lucide-react';
 
 interface ChangeApartmentModalProps {
     isOpen: boolean;
@@ -206,16 +206,25 @@ export const ChangeApartmentModal: React.FC<ChangeApartmentModalProps> = ({ isOp
                                 </div>
 
                                 <div className="pt-2 border-t border-green-100">
-                                    <label className="block text-xs font-bold text-green-700 uppercase tracking-wider mb-1.5">Nouveau Prix Final de la Transaction (DH)</label>
-                                    <input 
-                                        type="number"
-                                        value={transactionPrice || ''}
-                                        onChange={(e) => setTransactionPrice(Number(e.target.value))}
-                                        required
-                                        className="w-full px-4 py-2 bg-white border border-green-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm font-bold text-green-900"
-                                        placeholder="Saisissez le prix final"
-                                    />
-                                    <p className="text-[10px] text-green-600 mt-1 font-medium">Vous pouvez adapter ce prix négocié si nécessaire.</p>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <label className="block text-xs font-bold text-green-800 uppercase tracking-wider">Prix de la Transaction (DH)</label>
+                                        <span className="flex items-center text-[10px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-200">
+                                            <Lock className="w-3 h-3 mr-1" />
+                                            Fixé par la Propriété
+                                        </span>
+                                    </div>
+                                    <div className="relative">
+                                        <input 
+                                            type="number"
+                                            value={transactionPrice || ''}
+                                            readOnly
+                                            className="w-full px-4 py-2 bg-white/80 border border-green-200 rounded-xl cursor-not-allowed font-bold text-green-950 text-sm"
+                                        />
+                                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs font-bold text-green-700">
+                                            DH
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-green-700 mt-1 font-medium">Prix officiel du bien. Les changements de tarif s'effectuent dans la section <strong>Propriétés</strong>.</p>
                                 </div>
                             </div>
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getClients, getPayments, getContracts, getApartments, getProjects, addPayment, updatePayment } from '../services/api';
+import { getClients, getPayments, getContracts, getApartments, getProjects, addPayment, updatePayment, updateContract } from '../services/api';
 import { Client, Payment, PaymentStatus, Contract, ContractStatus, Apartment, PaymentMethod, Project } from '../types';
 import Modal from '../components/Modal';
 import { useAuth } from '../auth/AuthContext';
@@ -12,6 +12,7 @@ import { ClientReservationModal } from '../components/ClientReservationModal';
 import { EditContractModal } from '../components/EditContractModal';
 import { ChangeApartmentModal } from '../components/ChangeApartmentModal';
 import { ClientDesistementModal } from '../components/ClientDesistementModal';
+import Notification from '../components/Notification';
 import { Edit, Plus, RefreshCw, Lock, Undo2 } from 'lucide-react';
 
 // Helper to compress image before saving to Firestore (1MB limit)
@@ -82,6 +83,7 @@ const ClientDetailsPage: React.FC = () => {
     const [changingContractApt, setChangingContractApt] = useState<any | null>(null);
     const [desistingContract, setDesistingContract] = useState<any | null>(null);
     const [selectedPropertyFilter, setSelectedPropertyFilter] = useState<string>('all');
+    const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     const fetchData = useCallback(async () => {
         if (!clientId) return;
@@ -90,44 +92,28 @@ const ClientDetailsPage: React.FC = () => {
             const [clientsData, paymentsData, contractsData, apartmentsData, projectsData] = await Promise.all([
                 getClients(), getPayments(), getContracts(), getApartments(), getProjects()
             ]);
-            const currentClient = clientsData.find(c => c.id === clientId) || null;
+            const currentClient = clientsData.find(c => c.id === clientId || c.client_id === clientId) || null;
             
-            const rawClientPayments = paymentsData.filter(p => p.client_id === clientId);
-            
-            // Identify initial payments (oldest paid payment per contract)
-            const contractToInitialPaymentId = new Map<string, string>();
-            const contractsMap = new Map<string, typeof rawClientPayments>();
-            
-            rawClientPayments.forEach(p => {
-                if (p.contract_id) {
-                    if (!contractsMap.has(p.contract_id)) {
-                        contractsMap.set(p.contract_id, []);
-                    }
-                    contractsMap.get(p.contract_id)!.push(p);
-                }
-            });
-            
-            contractsMap.forEach((pList, contractId) => {
-                const paidPayments = pList.filter(p => p.status === PaymentStatus.Paid);
-                const candidates = paidPayments.length > 0 ? paidPayments : pList;
-                const sortedCandidates = [...candidates].sort((a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
-                if (sortedCandidates.length > 0) {
-                    contractToInitialPaymentId.set(contractId, sortedCandidates[0].id);
-                }
-            });
+            const clientContracts = contractsData.filter(c => 
+                c.client_id === clientId || 
+                (currentClient && (
+                    c.client_id === currentClient.id || 
+                    c.client_id === currentClient.client_id ||
+                    (currentClient.contracts && (currentClient.contracts.includes(c.id) || currentClient.contracts.includes(c.contract_id)))
+                ))
+            );
 
-            // Sort so that initial payments are strictly on top, followed by subsequent payments sorted chronologically
-            const clientPayments = [...rawClientPayments].sort((a, b) => {
-                const aIsInitial = contractToInitialPaymentId.get(a.contract_id) === a.id;
-                const bIsInitial = contractToInitialPaymentId.get(b.contract_id) === b.id;
-                
-                if (aIsInitial && !bIsInitial) return -1;
-                if (!aIsInitial && bIsInitial) return 1;
-                
-                return new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime();
-            });
+            const clientContractIds = new Set(clientContracts.flatMap(c => [c.id, c.contract_id].filter(Boolean)));
+            
+            const rawClientPayments = paymentsData.filter(p => 
+                p.client_id === clientId || 
+                (currentClient && (p.client_id === currentClient.id || p.client_id === currentClient.client_id)) ||
+                (p.contract_id && clientContractIds.has(p.contract_id))
+            );
 
-            const clientContracts = contractsData.filter(c => c.client_id === clientId);
+            const clientPayments = [...rawClientPayments].sort((a, b) => 
+                new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+            );
             
             setClient(currentClient);
             setPayments(clientPayments);
@@ -148,8 +134,8 @@ const ClientDetailsPage: React.FC = () => {
     
     const { activeContracts, archivedContracts, globalFinancials } = useMemo(() => {
         const withDetails = contracts.map(contract => {
-            const apartment = apartments.find(a => a.id === contract.apartment_id);
-            const project = projects.find(p => p.id === contract.project_id);
+            const apartment = apartments.find(a => a.id === contract.apartment_id || a.apartment_id === contract.apartment_id);
+            const project = projects.find(p => p.id === contract.project_id || p.id === apartment?.project_id);
             const totalPaid = payments.filter(p => p.contract_id === contract.id && p.status === PaymentStatus.Paid).reduce((sum, p) => sum + p.amount_dh, 0);
             return { 
                 ...contract, 
@@ -182,8 +168,8 @@ const ClientDetailsPage: React.FC = () => {
 
     const paymentsByProperty = useMemo(() => {
         const groups = contracts.map(contract => {
-            const apartment = apartments.find(a => a.id === contract.apartment_id);
-            const project = projects.find(p => p.id === contract.project_id);
+            const apartment = apartments.find(a => a.id === contract.apartment_id || a.apartment_id === contract.apartment_id);
+            const project = projects.find(p => p.id === contract.project_id || p.id === apartment?.project_id);
             const contractPayments = payments.filter(p => p.contract_id === contract.id);
             const totalPaid = contractPayments.filter(p => p.status === PaymentStatus.Paid).reduce((sum, p) => sum + p.amount_dh, 0);
             const floorText = apartment?.floor ? (apartment.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${apartment.floor}`) : null;
@@ -276,6 +262,13 @@ const ClientDetailsPage: React.FC = () => {
 
     return (
         <div className="space-y-10">
+            {notification && (
+                <Notification 
+                    message={notification.message} 
+                    type={notification.type} 
+                    onClose={() => setNotification(null)} 
+                />
+            )}
             <Link to="/clients" className="text-sm font-semibold text-green-600 hover:text-green-700 mb-6 flex items-center transition-colors">
                 <span className="mr-2">←</span> Retour à l'Annuaire
             </Link>
@@ -411,7 +404,9 @@ const ClientDetailsPage: React.FC = () => {
                                     <tbody className="divide-y divide-slate-50 font-semibold text-xs md:text-sm">
                                         {activeContracts.length > 0 ? activeContracts.map(c => {
                                             const paidPaymentsCount = payments.filter(p => p.contract_id === c.id && p.status === PaymentStatus.Paid).length;
-                                            const apt = apartments.find(a => a.id === c.apartment_id);
+                                            const apt = apartments.find(a => a.id === c.apartment_id || a.apartment_id === c.apartment_id);
+                                            const propertyPrice = apt?.sale_price_dh || apt?.price_dh;
+                                            const isPriceMismatch = propertyPrice && c.amount_dh !== propertyPrice;
                                             const floorText = apt?.floor ? (apt.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${apt.floor}`) : null;
                                             return (
                                                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
@@ -426,6 +421,11 @@ const ClientDetailsPage: React.FC = () => {
                                                                     🏢 {floorText}
                                                                 </span>
                                                             )}
+                                                            {isPriceMismatch && (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 w-fit" title={`Prix catalogue propriété: ${propertyPrice?.toLocaleString()} DH`}>
+                                                                    ⚠️ Différence Prix Propriété ({propertyPrice?.toLocaleString()} DH)
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div className="text-[10px] text-slate-400 mt-1">
                                                             <span className="sm:inline hidden">Total: {c.amount_dh.toLocaleString()} DH • </span>
@@ -433,9 +433,64 @@ const ClientDetailsPage: React.FC = () => {
                                                             <span className={`font-semibold ${paidPaymentsCount >= 2 ? 'text-amber-600' : 'text-slate-500'}`}>
                                                                 {paidPaymentsCount} versement{paidPaymentsCount > 1 ? 's' : ''} effectué{paidPaymentsCount > 1 ? 's' : ''}
                                                             </span>
+                                                            {isPriceMismatch && (
+                                                                <div className="sm:hidden mt-1.5">
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            if (!user || !propertyPrice) return;
+                                                                            try {
+                                                                                await updateContract(c.id, { amount_dh: propertyPrice }, user.user_id);
+                                                                                await fetchData();
+                                                                                setNotification({
+                                                                                    message: `Prix du contrat aligné avec succès sur ${propertyPrice.toLocaleString()} DH`,
+                                                                                    type: 'success'
+                                                                                });
+                                                                            } catch(err) {
+                                                                                console.error(err);
+                                                                                setNotification({
+                                                                                    message: "Erreur lors de la mise à jour du prix",
+                                                                                    type: 'error'
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                        className="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-1 rounded-lg border border-green-200"
+                                                                    >
+                                                                        ⚡ Aligner sur {propertyPrice?.toLocaleString()} DH
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </td>
-                                                    <td className="hidden sm:table-cell px-4 md:px-6 py-4 md:py-5 text-slate-900">{c.amount_dh.toLocaleString()} DH</td>
+                                                    <td className="hidden sm:table-cell px-4 md:px-6 py-4 md:py-5 text-slate-900">
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold">{c.amount_dh.toLocaleString()} DH</span>
+                                                            {isPriceMismatch && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!user || !propertyPrice) return;
+                                                                        try {
+                                                                            await updateContract(c.id, { amount_dh: propertyPrice }, user.user_id);
+                                                                            await fetchData();
+                                                                            setNotification({
+                                                                                message: `Prix du contrat aligné avec succès sur ${propertyPrice.toLocaleString()} DH`,
+                                                                                type: 'success'
+                                                                            });
+                                                                        } catch(err) {
+                                                                            console.error(err);
+                                                                            setNotification({
+                                                                                message: "Erreur lors de la mise à jour du prix",
+                                                                                type: 'error'
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                    className="text-[10px] font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 px-1.5 py-0.5 rounded border border-green-200 mt-1 w-fit transition-colors"
+                                                                    title="Cliquer pour corriger et appliquer le prix catalogue officiel"
+                                                                >
+                                                                    ⚡ Aligner sur {propertyPrice?.toLocaleString()} DH
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
                                                     <td className="px-4 md:px-6 py-4 md:py-5">
                                                         <span className={c.remainingAmount > 0 ? "text-red-600 font-bold" : "text-green-600"}>
                                                             {c.remainingAmount.toLocaleString()} DH

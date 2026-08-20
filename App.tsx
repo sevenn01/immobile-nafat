@@ -16,6 +16,7 @@ import ProjectDetailsPage from './pages/ProjectDetailsPage';
 import ClientDetailsPage from './pages/ClientDetailsPage';
 import SettingsPage from './pages/SettingsPage';
 import RejectedSalesPage from './pages/RejectedSalesPage';
+import Architectural3DPage from './pages/Architectural3DPage';
 import { useAuth } from './auth/AuthContext';
 import { seedAdminUser } from './firebase/seed';
 import SplashScreen from './components/SplashScreen';
@@ -80,6 +81,7 @@ const App: React.FC = () => {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/projets" element={<ProjectsPage />} />
             <Route path="/projets/:projectId" element={<ProjectDetailsPage />} />
+            <Route path="/plan-3d" element={<Architectural3DPage />} />
             <Route path="/appartements" element={<ApartmentsPage />} />
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/clients/:clientId" element={<ClientDetailsPage />} />

@@ -280,11 +280,39 @@ export const addApartment = async (apartment: Partial<Apartment>, userId: string
 
 export const updateApartment = async (apartmentId: string, data: Partial<Apartment>, userId: string) => {
   if (isDemo) {
-      const idx = mockDb.apartments.findIndex(a => a.id === apartmentId);
-      if (idx !== -1) mockDb.apartments[idx] = { ...mockDb.apartments[idx], ...data, updated_at: new Date().toISOString() };
+      const idx = mockDb.apartments.findIndex(a => a.id === apartmentId || a.apartment_id === apartmentId);
+      if (idx !== -1) {
+          mockDb.apartments[idx] = { ...mockDb.apartments[idx], ...data, updated_at: new Date().toISOString() };
+          const newPrice = data.sale_price_dh || data.price_dh;
+          if (newPrice) {
+              mockDb.contracts.forEach(c => {
+                  if ((c.apartment_id === apartmentId || c.apartment_id === mockDb.apartments[idx].id) && 
+                      c.status !== ContractStatus.Canceled && c.status !== ContractStatus.SaleCanceled) {
+                      c.amount_dh = newPrice;
+                      c.updated_at = new Date().toISOString();
+                  }
+              });
+          }
+      }
       return;
   }
   await db.collection('apartments').doc(apartmentId).update({ ...data, updated_by: userId, updated_at: new Date().toISOString() });
+  const newPrice = data.sale_price_dh || data.price_dh;
+  if (newPrice) {
+      try {
+          const contractsSnap = await db.collection('contracts').where('apartment_id', '==', apartmentId).get();
+          const batch = db.batch();
+          contractsSnap.forEach(docSnap => {
+              const contract = docSnap.data() as Contract;
+              if (contract.status !== ContractStatus.Canceled && contract.status !== ContractStatus.SaleCanceled) {
+                  batch.update(docSnap.ref, { amount_dh: newPrice, updated_by: userId, updated_at: new Date().toISOString() });
+              }
+          });
+          await batch.commit();
+      } catch (err) {
+          console.warn("Could not batch update contracts for apartment price change:", err);
+      }
+  }
 };
 
 export const deleteApartment = async (apartment: Apartment) => {
@@ -488,6 +516,63 @@ export const changeContractApartment = async (contractId: string, newApartmentId
     });
 
     await batch.commit();
+};
+
+export const syncContractPricesWithProperties = async (userId: string): Promise<{ updatedCount: number; updatedContracts: string[] }> => {
+    if (isDemo) {
+        let updatedCount = 0;
+        const updatedContracts: string[] = [];
+        mockDb.contracts.forEach(contract => {
+            const apt = mockDb.apartments.find(a => a.id === contract.apartment_id || a.apartment_id === contract.apartment_id);
+            if (apt) {
+                const targetPrice = apt.sale_price_dh || apt.price_dh;
+                if (targetPrice && contract.amount_dh !== targetPrice) {
+                    contract.amount_dh = targetPrice;
+                    contract.updated_at = new Date().toISOString();
+                    contract.updated_by = userId;
+                    updatedCount++;
+                    updatedContracts.push(contract.id);
+                }
+            }
+        });
+        return { updatedCount, updatedContracts };
+    }
+
+    try {
+        const [contractsSnap, aptsSnap] = await Promise.all([
+            db.collection('contracts').get(),
+            db.collection('apartments').get()
+        ]);
+        const apartments = aptsSnap.docs.map(doc => convertSnapshot<Apartment>(doc));
+        const batch = db.batch();
+        let updatedCount = 0;
+        const updatedContracts: string[] = [];
+
+        contractsSnap.docs.forEach(doc => {
+            const contract = convertSnapshot<Contract>(doc);
+            const apt = apartments.find(a => a.id === contract.apartment_id || a.apartment_id === contract.apartment_id);
+            if (apt) {
+                const targetPrice = apt.sale_price_dh || apt.price_dh;
+                if (targetPrice && (!contract.amount_dh || contract.amount_dh !== targetPrice)) {
+                    batch.update(doc.ref, {
+                        amount_dh: targetPrice,
+                        updated_at: new Date().toISOString(),
+                        updated_by: userId
+                    });
+                    updatedCount++;
+                    updatedContracts.push(contract.id);
+                }
+            }
+        });
+
+        if (updatedCount > 0) {
+            await batch.commit();
+        }
+        return { updatedCount, updatedContracts };
+    } catch (err) {
+        console.error("Error syncing contract prices with properties:", err);
+        throw err;
+    }
 };
 
 export const cancelContract = async (

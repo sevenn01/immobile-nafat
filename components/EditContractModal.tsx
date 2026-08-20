@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { updateContract } from '../services/api';
-import { Contract } from '../types';
+import { updateContract, getApartments } from '../services/api';
+import { Contract, Apartment } from '../types';
 import Modal from './Modal';
 import { useAuth } from '../auth/AuthContext';
+import { Lock } from 'lucide-react';
 
 interface EditContractModalProps {
     isOpen: boolean;
@@ -16,6 +17,7 @@ const inputClasses = "w-full px-4 py-2.5 bg-gray-50 border border-gray-200 round
 export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, onClose, contract, onSuccess }) => {
     const { user } = useAuth();
     const [amountDh, setAmountDh] = useState<string>('0');
+    const [propertyCatalogPrice, setPropertyCatalogPrice] = useState<number | null>(null);
     const [startDate, setStartDate] = useState<string>('');
     const [durationMonths, setDurationMonths] = useState<string>('12');
     const [notes, setNotes] = useState<string>('');
@@ -23,14 +25,29 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, on
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (contract) {
+        if (contract && isOpen) {
             setAmountDh(String(contract.amount_dh));
             setStartDate(contract.start_date || '');
             setDurationMonths(String(contract.duration_months || 12));
             setNotes(contract.notes || '');
             setError(null);
+
+            // Fetch property catalog price
+            const fetchApt = async () => {
+                try {
+                    const apts = await getApartments();
+                    const matchedApt = apts.find(a => a.id === contract.apartment_id || a.apartment_id === contract.apartment_id);
+                    if (matchedApt) {
+                        const price = matchedApt.sale_price_dh || matchedApt.price_dh || null;
+                        setPropertyCatalogPrice(price);
+                    }
+                } catch (e) {
+                    console.error("Error fetching property price:", e);
+                }
+            };
+            fetchApt();
         }
-    }, [contract]);
+    }, [contract, isOpen]);
 
     if (!contract) return null;
 
@@ -86,17 +103,34 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ isOpen, on
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Unité</p>
                     <h4 className="font-bold text-gray-800 text-base">{contract.apartmentName}</h4>
                     <p className="text-xs text-gray-500">Projet: {contract.projectName}</p>
+                    {propertyCatalogPrice !== null && (
+                        <div className="mt-2 pt-2 border-t border-gray-200 flex items-center justify-between">
+                            <span className="text-xs font-semibold text-gray-600">Prix catalogue propriété:</span>
+                            <span className="text-xs font-bold text-emerald-700">{propertyCatalogPrice.toLocaleString()} DH</span>
+                        </div>
+                    )}
                 </div>
 
                 <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Valeur de la Transaction (DH)</label>
-                    <input
-                        type="number"
-                        value={amountDh}
-                        onChange={(e) => setAmountDh(e.target.value)}
-                        required
-                        className={inputClasses}
-                    />
+                    <div className="flex items-center justify-between mb-1.5 ml-1">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest">Valeur de la Transaction (DH)</label>
+                        <span className="flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                            <Lock className="w-3 h-3 mr-1" />
+                            Fixé par la Propriété
+                        </span>
+                    </div>
+                    <div className="relative">
+                        <input
+                            type="number"
+                            value={propertyCatalogPrice !== null ? propertyCatalogPrice : amountDh}
+                            readOnly
+                            className={inputClasses + " bg-gray-100/80 cursor-not-allowed font-bold text-gray-800"}
+                        />
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs font-bold text-gray-400">
+                            DH
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1 ml-1">Pour modifier le prix de ce bien, rendez-vous dans la section <strong>Propriétés</strong>.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -36,11 +36,17 @@ const ProjectsPage: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [projectsData, apartmentsData] = await Promise.all([
+      const [rawProjectsData, apartmentsData] = await Promise.all([
           getProjects(),
           getApartments()
       ]);
       
+      // Remove duplicate ghali_1_project_id row if another GHALI 1 project exists
+      const hasMainGhali = rawProjectsData.some(p => (p.project_name || '').toUpperCase() === 'GHALI 1' && p.id !== 'ghali_1_project_id');
+      const projectsData = hasMainGhali 
+        ? rawProjectsData.filter(p => p.id !== 'ghali_1_project_id') 
+        : rawProjectsData;
+
       const projectsWithCounts = projectsData.map(p => ({
           ...p,
           rented_apartments_count: apartmentsData.filter(a => a.project_id === p.id && a.status === ApartmentStatus.Rented).length,

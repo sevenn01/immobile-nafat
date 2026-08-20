@@ -14,9 +14,11 @@ import {
 } from './icons/Icons';
 import { useAuth } from '../auth/AuthContext';
 import { AppPermissions, User } from '../types';
+import { Sparkles } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
   const { user } = useAuth() as { user: User | null };
+  const isDevUser = user?.email?.toLowerCase() === 'dev@dev';
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true';
   });
@@ -93,6 +95,18 @@ const Sidebar: React.FC = () => {
                 <BuildingIcon className="w-5 h-5 shrink-0" />
                 <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
                   Projets
+                </span>
+              </NavLink>
+          )}
+          {isDevUser && (
+              <NavLink
+                to="/plan-3d"
+                title={isCollapsed ? "Plan 3D Ghali 1" : undefined}
+                className={({ isActive }) => `${commonLinkClass} ${isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'} ${isActive ? 'bg-amber-600 text-white shadow-md font-bold' : 'hover:bg-slate-100 text-slate-800'}`}
+              >
+                <Sparkles className="w-5 h-5 shrink-0 text-amber-400" />
+                <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap font-bold ${isCollapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[200px] ml-3'}`}>
+                  Plan 3D (Dev)
                 </span>
               </NavLink>
           )}

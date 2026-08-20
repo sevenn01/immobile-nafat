@@ -3,6 +3,7 @@ import { getClients, addContract } from '../services/api';
 import { Client, Apartment, Contract, ContractStatus, ApartmentStatus, Project, Payment, PaymentStatus, PaymentMethod } from '../types';
 import Modal from './Modal';
 import { useAuth } from '../auth/AuthContext';
+import { Lock } from 'lucide-react';
 
 interface ReservationModalProps {
     isOpen: boolean;
@@ -181,16 +182,28 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">
-                            {isSale ? 'Prix Net (DH)' : 'Loyer Mensuel (DH)'}
-                        </label>
-                        <input 
-                            type="number" 
-                            step="any" 
-                            value={salePrice} 
-                            onChange={e => setSalePrice(e.target.value)} 
-                            className={inputClasses} 
-                        />
+                        <div className="flex items-center justify-between mb-1.5 ml-1">
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                {isSale ? 'Prix Net (DH)' : 'Loyer Mensuel (DH)'}
+                            </label>
+                            <span className="flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                <Lock className="w-3 h-3 mr-1" />
+                                Fixé par la Propriété
+                            </span>
+                        </div>
+                        <div className="relative">
+                            <input 
+                                type="number" 
+                                step="any" 
+                                value={salePrice} 
+                                readOnly
+                                className={inputClasses + " bg-gray-100/80 cursor-not-allowed font-bold text-gray-800"} 
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs font-bold text-gray-400">
+                                DH
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1 ml-1">Pour modifier le prix de ce bien, rendez-vous dans la section <strong>Propriétés</strong>.</p>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Date Signature</label>

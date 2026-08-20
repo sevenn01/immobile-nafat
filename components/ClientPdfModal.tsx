@@ -44,8 +44,17 @@ export const ClientPdfModal: React.FC<ClientPdfModalProps> = ({ client, onClose 
                 ]);
 
                 // Filter data for this client
-                const clientContracts = allContracts.filter(c => c.client_id === client.id);
-                const clientPayments = allPayments.filter(p => p.client_id === client.id);
+                const clientContracts = allContracts.filter(c => 
+                    c.client_id === client.id || 
+                    c.client_id === client.client_id || 
+                    (client.contracts && (client.contracts.includes(c.id) || client.contracts.includes(c.contract_id)))
+                );
+                const clientContractIds = new Set(clientContracts.flatMap(c => [c.id, c.contract_id].filter(Boolean)));
+                const clientPayments = allPayments.filter(p => 
+                    p.client_id === client.id || 
+                    p.client_id === client.client_id || 
+                    (p.contract_id && clientContractIds.has(p.contract_id))
+                );
 
                 setContracts(clientContracts);
                 setApartments(allApartments);
