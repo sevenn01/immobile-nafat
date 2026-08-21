@@ -63,7 +63,75 @@
 }
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm 12mm 15mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
   .no-print {
     display: none !important;
+  }
+
+  /* Reset modal backdrop & overlays for printing */
+  .fixed.inset-0,
+  div[class*="backdrop-blur"],
+  div[class*="bg-slate-900/"] {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  /* Authentic 4-page Contract Print Styles */
+  #authentic-contract-docx-container {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    gap: 0 !important;
+  }
+
+  #authentic-contract-docx-container > * + * {
+    margin-top: 0 !important;
+  }
+
+  .authentic-page {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 250mm !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+
+  .authentic-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 }

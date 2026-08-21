@@ -27,6 +27,7 @@ import {
 import { useAuth } from '../auth/AuthContext';
 import Modal from '../components/Modal';
 import CreateFinalContractModal from '../components/CreateFinalContractModal';
+import AuthenticContractModal from '../components/AuthenticContractModal';
 
 type FilterTab = 'all' | 'created' | 'pending' | 'completed_paid';
 type ViewMode = 'table' | 'cards';
@@ -898,169 +899,25 @@ export const FinalContractsPage: React.FC = () => {
                 />
             )}
 
-            {/* Legal Contract Preview Modal (Printable) */}
-            <Modal
-                title="Acte de Vente Définitif"
-                isOpen={isPreviewModalOpen}
-                onClose={() => {
-                    setIsPreviewModalOpen(false);
-                    setSelectedContractForPreview(null);
-                }}
-            >
-                {previewData && (
-                    <div className="space-y-6">
-                        {/* Header toolbar */}
-                        <div className="flex justify-between items-center border-b border-gray-100 pb-4 no-print flex-wrap gap-2">
-                            <div className="flex items-center space-x-2">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                                    {previewData.final_contract_reference || `ACTE-${previewData.apartment?.name}`}
-                                </span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <button
-                                    onClick={() => {
-                                        setIsPreviewModalOpen(false);
-                                        handleOpenCreateModal(previewData, true);
-                                    }}
-                                    className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-                                >
-                                    <Pencil className="w-3.5 h-3.5 mr-1.5 text-gray-500" /> Modifier l'Acte
-                                </button>
-                                <button
-                                    onClick={handlePrint}
-                                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-md text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
-                                >
-                                    <Printer className="w-4 h-4 mr-1.5" /> Imprimer l'Acte
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Printable Document Area */}
-                        <div 
-                            id="legal-contract-print-area" 
-                            className="print-card bg-slate-50 border border-gray-200 rounded-2xl p-8 max-h-[600px] overflow-y-auto font-serif text-gray-800 text-sm leading-relaxed shadow-inner"
-                        >
-                            {/* Document Header */}
-                            <div className="text-center space-y-2 mb-8">
-                                <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
-                                    ACTE DE VENTE DÉFINITIF
-                                </h2>
-                                <p className="text-xs italic text-gray-500">
-                                    {previewData.notary_name ? `Rédigé sous la forme : ${previewData.notary_name}` : 'Fait sous seing privé en double exemplaire'}
-                                </p>
-                                {previewData.final_contract_reference && (
-                                    <p className="text-[11px] font-mono font-bold text-gray-700">
-                                        Réf : {previewData.final_contract_reference}
-                                    </p>
-                                )}
-                                <div className="w-32 h-1 bg-gray-900 mx-auto mt-2"></div>
-                            </div>
-
-                            {/* Section: Parties */}
-                            <div className="space-y-4 mb-6">
-                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">
-                                    ENTRE LES SOUSSIGNÉS :
-                                </h3>
-                                <div className="pl-4">
-                                    <p className="font-bold text-gray-900">1. La société NAFAT IMMOBILIER S.A.R.L</p>
-                                    <p className="text-xs text-gray-600 pl-4">
-                                        Société au capital de 100 000 DH, dont le siège social est situé à Tétouan, Maroc, 
-                                        représentée légalement par son Gérant, ci-après dénommée le <strong>"VENDEUR"</strong>.
-                                    </p>
-                                </div>
-                                <div className="pl-4">
-                                    <p className="font-bold text-gray-900">2. M. / Mme. {previewData.client?.full_name}</p>
-                                    <p className="text-xs text-gray-600 pl-4">
-                                        Titulaire du CIN / Passeport n° <strong>{previewData.client?.cin_number}</strong>, 
-                                        demeurant à l'adresse suivante : {previewData.client?.address || 'Non renseignée'}, 
-                                        téléphone : {previewData.client?.phone || 'Non renseigné'}, 
-                                        ci-après dénommé(e) l'<strong>"ACQUÉREUR"</strong>.
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Section: Objet */}
-                            <div className="space-y-4 mb-6">
-                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">
-                                    OBJET DE LA VENTE :
-                                </h3>
-                                <p className="text-xs">
-                                    Le VENDEUR vend et cède en toute propriété, sous les garanties ordinaires de droit et de fait, à l'ACQUÉREUR, qui accepte, le bien immobilier désigné ci-après :
-                                </p>
-                                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2 text-xs">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div><span className="text-gray-500 font-medium">Projet :</span> <strong className="text-gray-900">{previewData.project?.project_name}</strong></div>
-                                        <div><span className="text-gray-500 font-medium">Type :</span> <strong className="text-gray-900 uppercase">{previewData.apartment?.type === 'garage' ? 'Garage' : 'Appartement'}</strong></div>
-                                        <div><span className="text-gray-500 font-medium">Désignation :</span> <strong className="text-gray-900">{previewData.apartment?.name}</strong></div>
-                                        <div><span className="text-gray-500 font-medium">Étage :</span> <strong className="text-gray-900">{previewData.apartment?.floor === 'RDC' ? 'Rez-de-chaussée' : `Étage ${previewData.apartment?.floor}`}</strong></div>
-                                        <div><span className="text-gray-500 font-medium">Surface habitable :</span> <strong className="text-gray-900">{previewData.apartment?.surface_m2} m²</strong></div>
-                                        <div>
-                                            <span className="text-gray-500 font-medium">TITRE FONCIER :</span>{' '}
-                                            <strong className="text-emerald-800 font-bold">
-                                                {previewData.effectiveTitre || 'En cours d\'immatriculation / Morcellement'}
-                                            </strong>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section: Prix */}
-                            <div className="space-y-4 mb-6">
-                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">
-                                    PRIX DE VENTE & MODALITÉS :
-                                </h3>
-                                <p className="text-xs">
-                                    La présente vente est consentie et acceptée moyennant le prix net de <strong>{previewData.amount_dh.toLocaleString()} DH</strong> (Dirhams Marocains).
-                                    {previewData.discount_dh && previewData.discount_dh > 0 ? (
-                                        <span className="text-gray-600 block mt-1 italic">
-                                            (Après application d'une remise commerciale de {previewData.discount_dh.toLocaleString()} DH sur le prix initial de {(previewData.original_price_dh || (previewData.amount_dh + previewData.discount_dh)).toLocaleString()} DH).
-                                        </span>
-                                    ) : null}
-                                </p>
-                                {previewData.isFullyPaid ? (
-                                    <p className="text-xs bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-900 italic">
-                                        "Le VENDEUR reconnaît expressément et définitivement par les présentes avoir reçu de l'ACQUÉREUR la totalité de la somme de {previewData.amount_dh.toLocaleString()} DH sous forme de versements successifs dument enregistrés. Le VENDEUR en donne quittance entière, définitive et sans réserve à l'ACQUÉREUR."
-                                    </p>
-                                ) : (
-                                    <p className="text-xs bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-900 italic">
-                                        "L'ACQUÉREUR a réglé à ce jour la somme de {previewData.totalPaid.toLocaleString()} DH. Le solde restant dû s'élève à la somme de {previewData.remaining.toLocaleString()} DH, payable selon l'échéancier convenu."
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Section: Clauses standards */}
-                            <div className="space-y-4 mb-8">
-                                <h3 className="font-bold border-b border-gray-300 pb-1 text-gray-900 uppercase">
-                                    DISPOSITIONS ET JOUISSANCE :
-                                </h3>
-                                <p className="text-xs text-gray-700">
-                                    {previewData.final_contract_clauses || "L'ACQUÉREUR sera propriétaire du bien immobilier à compter du jour de la signature des présentes et en aura la jouissance immédiate. Le VENDEUR déclare que le bien vendu est libre de toute dette ou hypothèque."}
-                                </p>
-                            </div>
-
-                            {/* Date of the contract */}
-                            <div className="text-right text-xs italic text-gray-700 mb-6">
-                                Fait à Tétouan, le {previewData.final_contract_date ? new Date(previewData.final_contract_date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
-                            </div>
-
-                            {/* Section: Signatures */}
-                            <div className="grid grid-cols-2 gap-4 border-t border-gray-300 pt-6 mt-8">
-                                <div className="text-center space-y-12">
-                                    <p className="text-xs font-bold text-gray-500 uppercase">La Signature de l'Acquéreur</p>
-                                    <div className="h-16"></div>
-                                    <p className="text-xs font-serif italic text-gray-400">Lu et approuvé</p>
-                                </div>
-                                <div className="text-center space-y-12">
-                                    <p className="text-xs font-bold text-gray-500 uppercase">Pour Nafat Immobilier (Le Vendeur)</p>
-                                    <div className="h-16"></div>
-                                    <p className="text-xs font-serif italic text-gray-400">Lu et approuvé</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </Modal>
+            {/* Authentic 4-Page Moroccan Notarial Legal Contract Modal (DOCX Format) */}
+            {isPreviewModalOpen && previewData && (
+                <AuthenticContractModal
+                    isOpen={isPreviewModalOpen}
+                    onClose={() => {
+                        setIsPreviewModalOpen(false);
+                        setSelectedContractForPreview(null);
+                    }}
+                    contract={previewData}
+                    client={previewData.client}
+                    apartment={previewData.apartment}
+                    project={previewData.project}
+                    payments={payments}
+                    onEdit={() => {
+                        setIsPreviewModalOpen(false);
+                        handleOpenCreateModal(previewData, true);
+                    }}
+                />
+            )}
         </div>
     );
 };
